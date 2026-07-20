@@ -1,16 +1,19 @@
 """任务列表视图（M1 主视图）
 
-底部导航 4 tab（PRD 12 章）：
+底部导航 3 tab（Q50 调整）：
 - 任务 tab（/tasks，默认）：TaskTree 任务列表 + 添加按钮
-- 步骤 tab（/step_editor）：跳转 StepEditorView
-- 统计 tab（/stats）：M4 模块（M1 阶段先占位）
-- 设置 tab（/settings）：跳转 SettingsView
+- 统计 tab（/stats）：点击直接跳转 StatsView
+- 日志 tab（/logs）：点击直接跳转 LogsView
+- 设置图标常驻 AppBar（添加任务左边）→ /settings
 
 变更记录:
 - Q37: 默认路由改为 /tasks（覆盖需求6）
 - Q38: TaskCard 用 PRD 原样样式
 - Q39: TaskTree 支持 tree/breadcrumb 双模式（设置可切换，默认 tree）
-- Q40: 4 tab 框架，统计/日志 tab 先占位
+- Q40: 4 tab 框架（任务/步骤/统计/设置）
+- Q50: 调整为 3 tab（任务/统计/日志）+ AppBar 设置；步骤 tab 去掉
+- Q50: 任务卡片左下角加删除按钮（二次确认）
+- Q50: 抽屉关闭改为点击遮罩 + 取消按钮双关闭
 """
 from __future__ import annotations
 
@@ -29,7 +32,7 @@ _INK = "#1a1a2e"
 _MUTED = "#6b7280"
 _RULE = "#e5e7eb"
 
-TabKey = Literal["tasks", "steps", "stats", "settings"]
+TabKey = Literal["tasks", "stats", "logs"]
 
 
 # ---- mock 数据（T1.4 将扩展） ----
@@ -133,10 +136,12 @@ class HomeView(ft.View):
             on_execute=self._handle_execute_task,
             on_click=self._handle_click_task,
             on_navigate=self._handle_breadcrumb_navigate,
+            on_delete=self._handle_delete_task,
             expanded_ids=set(),
         )
 
         # 任务编辑抽屉（T1.3，初始隐藏）
+        # 抽屉遮罩容器：点击空白处关闭抽屉（Q50）
         self._drawer = TaskEditDrawer(
             on_save=self._handle_save_task,
             on_cancel=self._handle_close_drawer,
@@ -145,30 +150,40 @@ class HomeView(ft.View):
         self._overlay = ft.Container(
             content=self._drawer,
             alignment=ft.Alignment.CENTER_RIGHT,
-            bgcolor="#00000000",  # 透明背景
+            bgcolor="#80000000",  # 半透明黑色遮罩
             visible=False,
             expand=True,
+            on_click=self._handle_overlay_click,
         )
 
-        # 添加任务按钮（参照 F9a：胶囊状）
+        # 设置按钮（常驻 AppBar 左侧，Q50 需求12）
+        settings_btn = ft.IconButton(
+            icon=ft.Icons.SETTINGS,
+            on_click=self._handle_goto_settings,
+            tooltip="设置",
+            icon_color="white",
+        )
+
+        # 添加任务按钮（Q50：设置在左，添加在右）
         add_btn = ft.Button(
             "添加任务",
             icon=ft.Icons.ADD,
             on_click=self._handle_add_task,
-            bgcolor=_ACCENT,
-            color="white",
+            bgcolor="white",
+            color=_ACCENT,
             tooltip="添加任务",
         )
 
-        # AppBar
+        # AppBar（设置在左，添加任务在右）
         appbar = ft.AppBar(
+            leading=settings_btn,
             title=ft.Text("任务管理"),
             actions=[add_btn],
             bgcolor=_ACCENT,
             color="white",
         )
 
-        # 底部导航（4 tab，Q40 决策）
+        # 底部导航（3 tab，Q50：任务/统计/日志）
         nav_bar = ft.NavigationBar(
             selected_index=self._tab_to_index(initial_tab),
             destinations=[
@@ -178,19 +193,14 @@ class HomeView(ft.View):
                     label="任务",
                 ),
                 ft.NavigationBarDestination(
-                    icon=ft.Icons.LIST_OUTLINED,
-                    selected_icon=ft.Icons.LIST,
-                    label="步骤",
-                ),
-                ft.NavigationBarDestination(
                     icon=ft.Icons.BAR_CHART_OUTLINED,
                     selected_icon=ft.Icons.BAR_CHART,
                     label="统计",
                 ),
                 ft.NavigationBarDestination(
-                    icon=ft.Icons.SETTINGS_OUTLINED,
-                    selected_icon=ft.Icons.SETTINGS,
-                    label="设置",
+                    icon=ft.Icons.LIST_ALT_OUTLINED,
+                    selected_icon=ft.Icons.LIST,
+                    label="日志",
                 ),
             ],
             on_change=self._handle_tab_change,
@@ -219,21 +229,10 @@ class HomeView(ft.View):
         )
 
     def _build_main_content(self) -> ft.Control:
-        """构建主内容（含 tab 切换 + 抽屉）"""
-        return self._build_tab_content()
+        """构建主内容（任务列表 + 抽屉）"""
+        return self._build_tasks_tab()
 
     # ---- tab 渲染 ----
-
-    def _build_tab_content(self) -> ft.Control:
-        """根据当前 tab 渲染对应内容"""
-        if self._current_tab == "tasks":
-            return self._build_tasks_tab()
-        elif self._current_tab == "steps":
-            return self._build_steps_tab()
-        elif self._current_tab == "stats":
-            return self._build_stats_tab()
-        else:  # settings
-            return self._build_settings_tab()
 
     def _build_tasks_tab(self) -> ft.Control:
         """任务 tab：section-title + TaskTree"""
@@ -272,221 +271,27 @@ class HomeView(ft.View):
             expand=True,
         )
 
-    def _build_steps_tab(self) -> ft.Control:
-        """步骤 tab：跳转到 /step_editor"""
-        return ft.Column(
-            controls=[
-                ft.Container(
-                    content=ft.Column(
-                        controls=[
-                            ft.Icon(
-                                icon=ft.Icons.LIST_ALT,
-                                color=_ACCENT,
-                                size=48,
-                            ),
-                            ft.Text(
-                                "步骤编辑器",
-                                size=18,
-                                weight=ft.FontWeight.W_600,
-                                color=_INK,
-                            ),
-                            ft.Text(
-                                "点击下方按钮进入步骤编辑器",
-                                size=12,
-                                color=_MUTED,
-                            ),
-                            ft.Button(
-                                "进入步骤编辑器",
-                                icon=ft.Icons.ARROW_FORWARD,
-                                on_click=self._handle_goto_steps,
-                                bgcolor=_ACCENT,
-                                color="white",
-                            ),
-                        ],
-                        alignment=ft.MainAxisAlignment.CENTER,
-                        horizontal_alignment=ft.CrossAxisAlignment.CENTER,
-                        spacing=12,
-                    ),
-                    alignment=ft.Alignment.CENTER,
-                    expand=True,
-                ),
-            ],
-            expand=True,
-        )
-
-    def _build_stats_tab(self) -> ft.Control:
-        """统计 tab：跳转到 /stats（M4）+ /logs（M5）"""
-        return ft.Column(
-            controls=[
-                ft.Container(
-                    content=ft.Column(
-                        controls=[
-                            ft.Icon(
-                                icon=ft.Icons.BAR_CHART,
-                                color=_ACCENT,
-                                size=48,
-                            ),
-                            ft.Text(
-                                "执行统计与日志",
-                                size=18,
-                                weight=ft.FontWeight.W_600,
-                                color=_INK,
-                            ),
-                            ft.Text(
-                                "查看任务执行次数、成功率、平均时长等统计数据\n查看每次任务执行的详细日志",
-                                size=12,
-                                color=_MUTED,
-                                text_align=ft.TextAlign.CENTER,
-                            ),
-                            ft.Row(
-                                controls=[
-                                    ft.Button(
-                                        "进入统计页",
-                                        icon=ft.Icons.BAR_CHART_OUTLINED,
-                                        on_click=self._handle_goto_stats,
-                                        bgcolor=_ACCENT,
-                                        color="white",
-                                        expand=True,
-                                    ),
-                                    ft.Button(
-                                        "进入日志页",
-                                        icon=ft.Icons.LIST_ALT,
-                                        on_click=self._handle_goto_logs,
-                                        bgcolor="#1a1a2e",
-                                        color="white",
-                                        expand=True,
-                                    ),
-                                ],
-                                spacing=8,
-                            ),
-                        ],
-                        alignment=ft.MainAxisAlignment.CENTER,
-                        horizontal_alignment=ft.CrossAxisAlignment.CENTER,
-                        spacing=12,
-                    ),
-                    alignment=ft.Alignment.CENTER,
-                    expand=True,
-                ),
-            ],
-            expand=True,
-        )
-
-    def _build_settings_tab(self) -> ft.Control:
-        """设置 tab：跳转到 /settings"""
-        return ft.Column(
-            controls=[
-                ft.Container(
-                    content=ft.Column(
-                        controls=[
-                            ft.Icon(
-                                icon=ft.Icons.SETTINGS,
-                                color=_ACCENT,
-                                size=48,
-                            ),
-                            ft.Text(
-                                "系统设置",
-                                size=18,
-                                weight=ft.FontWeight.W_600,
-                                color=_INK,
-                            ),
-                            ft.Text(
-                                "点击下方按钮进入设置页",
-                                size=12,
-                                color=_MUTED,
-                            ),
-                            ft.Button(
-                                "进入设置",
-                                icon=ft.Icons.ARROW_FORWARD,
-                                on_click=self._handle_goto_settings,
-                                bgcolor=_ACCENT,
-                                color="white",
-                            ),
-                        ],
-                        alignment=ft.MainAxisAlignment.CENTER,
-                        horizontal_alignment=ft.CrossAxisAlignment.CENTER,
-                        spacing=12,
-                    ),
-                    alignment=ft.Alignment.CENTER,
-                    expand=True,
-                ),
-            ],
-            expand=True,
-        )
-
-    def _build_placeholder(
-        self, icon: str, title: str, message: str
-    ) -> ft.Control:
-        """通用占位页（Q5 决策：预留接口 + 显示"尚未完成"）"""
-        return ft.Column(
-            controls=[
-                ft.Container(
-                    content=ft.Column(
-                        controls=[
-                            ft.Icon(
-                                icon=icon,
-                                color=_MUTED,
-                                size=48,
-                            ),
-                            ft.Text(
-                                title,
-                                size=18,
-                                weight=ft.FontWeight.W_600,
-                                color=_INK,
-                            ),
-                            ft.Container(
-                                content=ft.Text(
-                                    "尚未完成",
-                                    size=12,
-                                    color="white",
-                                    weight=ft.FontWeight.W_500,
-                                ),
-                                bgcolor=_MUTED,
-                                padding=ft.Padding(left=8, right=8, top=4, bottom=4),
-                                border_radius=8,
-                            ),
-                            ft.Text(
-                                message,
-                                size=12,
-                                color=_MUTED,
-                                text_align=ft.TextAlign.CENTER,
-                            ),
-                        ],
-                        alignment=ft.MainAxisAlignment.CENTER,
-                        horizontal_alignment=ft.CrossAxisAlignment.CENTER,
-                        spacing=12,
-                    ),
-                    alignment=ft.Alignment.CENTER,
-                    expand=True,
-                ),
-            ],
-            expand=True,
-        )
-
     # ---- tab 转换 ----
 
     @staticmethod
     def _tab_to_index(tab: TabKey) -> int:
         """tab key 转 NavigationBar selected_index"""
-        return {"tasks": 0, "steps": 1, "stats": 2, "settings": 3}[tab]
+        return {"tasks": 0, "stats": 1, "logs": 2}[tab]
 
     @staticmethod
     def _index_to_tab(index: int) -> TabKey:
         """NavigationBar selected_index 转 tab key"""
-        mapping = {0: "tasks", 1: "steps", 2: "stats", 3: "settings"}
+        mapping = {0: "tasks", 1: "stats", 2: "logs"}
         return mapping.get(index, "tasks")  # type: ignore[return-value]
 
     # ---- 事件处理 ----
 
     def _handle_tab_change(self, e: ft.NavigationBarEvent) -> None:
-        """tab 切换"""
-        new_tab = self._index_to_tab(int(e.control.selected_index) if hasattr(e.control, "selected_index") else 0)
+        """tab 切换：统计/日志直接跳路由，任务保持"""
+        new_tab = self._index_to_tab(
+            int(e.control.selected_index) if hasattr(e.control, "selected_index") else 0
+        )
         self._current_tab = new_tab
-        # 重新构建视图内容
-        self.controls = [
-            self.controls[0],  # AppBar
-            ft.SafeArea(content=self._build_tab_content(), expand=True),
-            self.controls[2],  # NavigationBar
-        ]
         try:
             self._page.update()
         except Exception:
@@ -495,13 +300,12 @@ class HomeView(ft.View):
         # 路由跳转
         route_map = {
             "tasks": "/tasks",
-            "steps": "/step_editor",
             "stats": "/stats",
-            "settings": "/settings",
+            "logs": "/logs",
         }
         target_route = route_map.get(new_tab, "/tasks")
-        if new_tab in ("steps", "settings"):
-            # steps 和 settings 跳转到独立 View
+        if new_tab != "tasks":
+            # 统计/日志跳转到独立路由
             try:
                 self._page.go(target_route)
             except Exception:
@@ -558,14 +362,28 @@ class HomeView(ft.View):
         except Exception:
             pass
 
-    def _handle_close_drawer(self) -> None:
-        """关闭抽屉"""
+    def _handle_close_drawer(self, e: ft.ControlEvent | None = None) -> None:
+        """关闭抽屉（清除遮罩 + 清空 content 引用，避免黑屏）"""
+        # 阻止遮罩点击触发取消后再次冒泡
+        if e is not None:
+            try:
+                e.stop_propagation = True
+            except Exception:
+                pass
         self._drawer_visible = False
         self._overlay.visible = False
+        # 清空遮罩内容引用，避免下次 update 时引用失效的控件
+        self._overlay.content = None
         try:
             self._page.update()
         except Exception:
             pass
+
+    def _handle_overlay_click(self, e: ft.ControlEvent) -> None:
+        """点击遮罩空白处关闭抽屉（Q50）"""
+        # 仅当点击的是遮罩本身（而非内部抽屉）时关闭
+        if e.control == self._overlay:
+            self._handle_close_drawer(e)
 
     def _refresh_task_tree(self) -> None:
         """刷新任务树"""
@@ -576,12 +394,18 @@ class HomeView(ft.View):
             on_execute=self._handle_execute_task,
             on_click=self._handle_click_task,
             on_navigate=self._handle_breadcrumb_navigate,
+            on_delete=self._handle_delete_task,
             expanded_ids=self._task_tree._expanded_ids,
             current_parent_id=self._task_tree._current_parent_id,
         )
         # 替换原任务树引用
         self._task_tree = new_tree
-        # 更新主内容（需要重新构建视图）
+        # 重新构建视图
+        self.controls = [
+            self.controls[0],  # AppBar
+            ft.SafeArea(content=self._build_main_content(), expand=True),
+            self.controls[2],  # NavigationBar
+        ]
         try:
             self._page.update()
         except Exception:
@@ -610,7 +434,6 @@ class HomeView(ft.View):
         for task in self._tasks:
             if task.id == task_id:
                 task.enabled = enabled
-                task.updated_at = task.updated_at  # 触发 dataclass 默认？保留原值
                 break
         # 不重新渲染，避免打断交互
 
@@ -647,34 +470,34 @@ class HomeView(ft.View):
         except Exception:
             pass
 
+    def _handle_delete_task(self, task_id: str) -> None:
+        """删除任务（Q50 需求11：二次确认后删除）"""
+        # 找到任务
+        task = next((t for t in self._tasks if t.id == task_id), None)
+        if task is None:
+            return
+        # 从任务列表中删除
+        self._tasks = [t for t in self._tasks if t.id != task_id]
+        # 删除相关的关系（作为父或子）
+        self._relations = [
+            r for r in self._relations if r.parent_id != task_id and r.child_id != task_id
+        ]
+        # 刷新任务树
+        self._refresh_task_tree()
+        # 通知用户
+        try:
+            self._page.snackbar = ft.SnackBar(ft.Text(f"任务「{task.name}」已删除"))
+            self._page.update()
+        except Exception:
+            pass
+
     def _handle_breadcrumb_navigate(self, target_id: str | None) -> None:
         """面包屑导航切换层级（仅 breadcrumb 模式触发）"""
         # TaskTree 内部已更新，这里只做额外处理（如持久化当前层级）
         pass
 
-    def _handle_goto_steps(self, e: ft.ControlEvent) -> None:
-        """跳转到步骤编辑器"""
-        try:
-            self._page.go("/step_editor")
-        except Exception:
-            pass
-
-    def _handle_goto_stats(self, e: ft.ControlEvent) -> None:
-        """跳转到统计页（M4）"""
-        try:
-            self._page.go("/stats")
-        except Exception:
-            pass
-
-    def _handle_goto_logs(self, e: ft.ControlEvent) -> None:
-        """跳转到日志页（M5）"""
-        try:
-            self._page.go("/logs")
-        except Exception:
-            pass
-
     def _handle_goto_settings(self, e: ft.ControlEvent) -> None:
-        """跳转到设置页"""
+        """跳转到设置页（Q50 需求12：AppBar 设置按钮）"""
         try:
             self._page.go("/settings")
         except Exception:

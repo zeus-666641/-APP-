@@ -94,13 +94,17 @@ class TaskCard(ft.Container):
 
     布局：[图标块] [任务名 + 状态点] [执行按钮 + 启用开关 + 展开按钮]
 
+    注意：使用 `card_data` 而非 `data`，避免与 ft.Control.data 属性冲突
+    （后者默认为 None，会在 super().__init__() 后覆盖 self.data）
+
     Attributes:
-        data: 卡片数据
+        card_data: 卡片数据
         depth: 在树中的深度（用于缩进）
         on_toggle_enabled: 启用/禁用回调
         on_execute: 执行按钮回调
         on_click: 点击卡片回调（进详情）
         on_toggle_expand: 展开/折叠子任务回调
+        on_delete: 删除回调（Q50 需求11：左下角删除按钮）
         has_children: 是否有子任务
         is_expanded: 当前是否展开
     """
@@ -113,17 +117,21 @@ class TaskCard(ft.Container):
         on_execute: Callable[[str], None] | None = None,
         on_click: Callable[[str], None] | None = None,
         on_toggle_expand: Callable[[str], None] | None = None,
+        on_delete: Callable[[str], None] | None = None,
         has_children: bool = False,
         is_expanded: bool = False,
     ) -> None:
-        self.data = data
+        # 注意：self.card_data 必须在 super().__init__() 之后赋值
+        # 否则会被 ft.Control.data 默认值 None 覆盖
         self._depth = depth
         self._on_toggle_enabled = on_toggle_enabled
         self._on_execute = on_execute
         self._on_click = on_click
         self._on_toggle_expand = on_toggle_expand
+        self._on_delete = on_delete
         self._has_children = has_children
         self._is_expanded = is_expanded
+        self._card_data = data  # 临时存储，super().__init__() 后会重新赋值
 
         status_color = STATUS_COLORS[data.status]
         status_label = STATUS_LABELS[data.status]
@@ -213,12 +221,11 @@ class TaskCard(ft.Container):
         actions_row = ft.Row(
             controls=actions_controls,
             spacing=2,
-            width=_ACTIONS_WIDTH,
             alignment=ft.MainAxisAlignment.END,
             vertical_alignment=ft.CrossAxisAlignment.CENTER,
         )
 
-        # 主行
+        # 主行（图标 + 任务名 + 状态 + 操作）
         main_row = ft.Row(
             controls=[icon_box, info_column, actions_row],
             alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
@@ -226,38 +233,135 @@ class TaskCard(ft.Container):
             spacing=12,
         )
 
-        # 卡片容器（带缩进 padding，树形模式用）
+        # 左下角删除按钮（Q50 需求11，与 LogCard 一致）
+        delete_btn = ft.TextButton(
+            "删除",
+            icon=ft.Icons.DELETE_OUTLINE,
+            on_click=self._handle_delete_click,
+            style=ft.ButtonStyle(
+                color=_DANGER,
+                padding=ft.Padding(left=4, right=4, top=0, bottom=0),
+            ),
+        )
+
+        # 底部行：删除按钮 + 占位
+        footer_row = ft.Row(
+            controls=[delete_btn, ft.Container(expand=True)],
+            vertical_alignment=ft.CrossAxisAlignment.CENTER,
+            spacing=0,
+        )
+
+        # 卡片内容（主行 + 底部删除按钮）
+        card_content = ft.Column(
+            controls=[main_row, footer_row],
+            spacing=8,
+        )
+
+        # 卡片容器（自适应宽度，由外层 Container 控制缩进）
         super().__init__(
-            content=main_row,
-            width=_CARD_WIDTH,
-            padding=ft.Padding(left=12, right=12, top=12, bottom=12),
+            content=card_content,
+            padding=ft.Padding(left=12, right=12, top=10, bottom=8),
             bgcolor=_BG2,
             border_radius=10,
             border=ft.Border.all(1, _RULE),
             on_click=self._handle_click,
+            on_hover=self._handle_hover,
         )
+        # 必须在 super().__init__() 之后赋值，避免被 ft.Control.data 默认值覆盖
+        self._card_data = data
+
+    @property
+    def card_data(self) -> TaskCardData:
+        """卡片数据"""
+        return self._card_data
 
     def _handle_toggle(self, e: ft.ControlEvent) -> None:
+        """启用开关切换"""
         e.stop_propagation = True
         new_value = bool(e.control.value)
-        self.data.enabled = new_value
+        self._card_data.enabled = new_value
         if self._on_toggle_enabled:
-            self._on_toggle_enabled(self.data.task_id, new_value)
+            self._on_toggle_enabled(self._card_data.task_id, new_value)
 
     def _handle_execute(self, e: ft.ControlEvent) -> None:
+        """执行按钮点击"""
         e.stop_propagation = True
         if self._on_execute:
-            self._on_execute(self.data.task_id)
+            self._on_execute(self._card_data.task_id)
 
     def _handle_click(self, e: ft.ControlEvent) -> None:
+        """卡片整体点击"""
         e.stop_propagation = True
         if self._on_click:
-            self._on_click(self.data.task_id)
+            self._on_click(self._card_data.task_id)
 
     def _handle_toggle_expand(self, e: ft.ControlEvent) -> None:
+        """展开/折叠按钮点击"""
         e.stop_propagation = True
         if self._on_toggle_expand:
-            self._on_toggle_expand(self.data.task_id)
+            self._on_toggle_expand(self._card_data.task_id)
+
+    def _handle_delete_click(self, e: ft.ControlEvent) -> None:
+        """删除按钮点击（阻止冒泡，弹出二次确认，Q50 需求11）"""
+        e.stop_propagation = True
+        if not self._on_delete:
+            return
+        page = e.page
+        if page is None:
+            # 无 page 上下文（测试环境），直接执行
+            self._on_delete(self._card_data.task_id)
+            return
+
+        task_name = self._card_data.name
+        task_id = self._card_data.task_id
+
+        def _close_dialog(_e: ft.ControlEvent | None = None) -> None:
+            dialog.open = False
+            try:
+                page.update()
+            except Exception:
+                pass
+            if dialog in page.overlay:
+                page.overlay.remove(dialog)
+
+        def _confirm_delete(_e: ft.ControlEvent) -> None:
+            _close_dialog()
+            if self._on_delete:
+                self._on_delete(task_id)
+
+        dialog = ft.AlertDialog(
+            modal=True,
+            title=ft.Text("确认删除"),
+            content=ft.Text(
+                f"确定要删除任务「{task_name}」吗？此操作不可撤销。"
+            ),
+            actions=[
+                ft.Button("取消", on_click=_close_dialog),
+                ft.Button(
+                    "确认删除",
+                    on_click=_confirm_delete,
+                    bgcolor=_DANGER,
+                    color="white",
+                ),
+            ],
+        )
+        page.overlay.append(dialog)
+        dialog.open = True
+        try:
+            page.update()
+        except Exception:
+            pass
+
+    def _handle_hover(self, e: ft.ControlEvent) -> None:
+        """鼠标悬停高亮"""
+        if e.data:
+            self.bgcolor = "#f9fafb"
+        else:
+            self.bgcolor = _BG2
+        try:
+            e.page.update()
+        except Exception:
+            pass
 
 
 class TaskTree(ft.Column):
@@ -290,6 +394,7 @@ class TaskTree(ft.Column):
         on_execute: Callable[[str], None] | None = None,
         on_click: Callable[[str], None] | None = None,
         on_navigate: Callable[[str | None], None] | None = None,
+        on_delete: Callable[[str], None] | None = None,
         expanded_ids: set[str] | None = None,
         current_parent_id: str | None = None,
     ) -> None:
@@ -299,6 +404,7 @@ class TaskTree(ft.Column):
         self._on_execute = on_execute
         self._on_click = on_click
         self._on_navigate = on_navigate
+        self._on_delete = on_delete
         self._expanded_ids = expanded_ids or set()
         self._current_parent_id = current_parent_id
 
@@ -340,12 +446,13 @@ class TaskTree(ft.Column):
                 on_execute=self._on_execute,
                 on_click=self._on_click,
                 on_toggle_expand=self._handle_toggle_expand,
+                on_delete=self._on_delete,
                 has_children=has_children,
                 is_expanded=is_expanded,
             )
             indent_container = ft.Container(
                 content=card,
-                padding=ft.Padding(left=depth * _INDENT_STEP, right=0, top=0, bottom=0),
+                padding=ft.Padding(left=depth * _INDENT_STEP, right=depth * _INDENT_STEP, top=0, bottom=0),
             )
             controls.append(indent_container)
 
@@ -397,6 +504,7 @@ class TaskTree(ft.Column):
                 on_execute=self._on_execute,
                 on_click=self._handle_card_click_breadcrumb,
                 on_toggle_expand=None,
+                on_delete=self._on_delete,
                 has_children=bool(node.children),
                 is_expanded=False,
             )

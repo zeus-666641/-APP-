@@ -453,3 +453,74 @@
 - **用户选择**：搜索 + 单条删除（删除按钮放在卡片左下角）；列表页不分页
 
 ---
+
+## 2026-07-20 续6（M5 完成后 Bug 修复 + 需求调整）
+
+### Q50. tab 结构调整（覆盖 Q40）
+- **问题**：M5 完成后用户预览反馈 15 个问题，其中需求 9+12+13 要求去掉步骤 tab、设置常驻 AppBar、日志 tab 与任务/统计同级。怎么调？
+- **选项**：
+  1. 3 tab（任务/统计/日志）+ AppBar 设置（步骤 tab 去掉，设置常驻 AppBar leading）
+  2. 4 tab（任务/统计/日志/设置）保持原结构
+  3. 2 tab（任务/日志）+ 设置 AppBar（去掉统计 tab，统计通过任务卡片入口）
+- **用户选择**：选 1 3 tab + AppBar 设置
+- **影响**：
+  - home_view 重写：3 tab（任务/统计/日志），AppBar leading=设置按钮，actions=添加任务
+  - 步骤 tab 去掉（步骤编辑器从任务卡片进入，原有路由 /step_editor 保留）
+  - 统计/日志 tab 点击直接 `page.go("/stats")` / `page.go("/logs")` 跳路由
+  - routes.py 调整：所有路由栈底保留 HomeView（点返回回任务列表）
+  - Q40 的 4 tab 决策作废
+
+### Q51. UI 设计文件形式（需求 15）
+- **问题**：需求 15 要求"分析软件 UI 生成 UI 设计文件"，采用哪种形式？
+- **选项**：
+  1. 仅 Markdown 设计规范（颜色/字号/间距/组件清单 + 文字描述）
+  2. 仅 HTML 原型（可在浏览器查看的高保真原型，含配色和布局）
+  3. 两者结合：Markdown 规范（开发者读）+ HTML 原型（设计审阅）
+- **用户选择**：第二再加上第一（HTML 原型 + Markdown 规范）
+- **影响**：
+  - 产出 `docs/ui_design/step_recorder_ui.html`（HTML 原型，含所有页面/状态）
+  - 产出 `docs/ui_design/ui_design_spec.md`（设计规范文档）
+  - HTML 原型复用 PRD HTML 的 :root CSS 变量，保证视觉一致性
+
+### Q52. 抽屉关闭交互（Bug 2 修复方案）
+- **问题**：Bug 2 抽屉关闭后黑屏，怎么修？
+- **选项**：
+  1. 仅点击遮罩关闭（取消按钮改为不可点，只支持点遮罩）
+  2. 点击遮罩 + 取消按钮双关闭（两种方式都支持，更友好）
+  3. 仅取消按钮关闭（保持原样，修黑屏根因）
+- **用户选择**：选 2 点击遮罩 + 取消按钮双关闭
+- **影响**：
+  - `_handle_overlay_click`：判断 `e.control == self._overlay` 才关闭（避免点到抽屉内部也关）
+  - `_handle_close_drawer`：清除 `self._overlay.content = None` 引用，避免下次 update 时引用失效的控件导致黑屏
+  - `e.stop_propagation = True` 阻止抽屉内部按钮事件冒泡到遮罩
+
+### Q53. UI 设计集成到工作流（需求 15）
+- **问题**：需求 15 要求"把 UI 设计这一步集成到工作流中（记忆/规则/骨架之类的所有）"，集成到哪些文件？
+- **选项**：
+  1. 仅骨架.md（在 7 大项目中新增"UI 设计"流程）
+  2. 骨架.md + 编码习惯.md（增加 UI 一致性检查项）
+  3. 骨架.md + 编码习惯.md + 规则.md（三者全部补充，硬性要求）
+- **用户选择**：选 3 三者全部补充
+- **影响**：
+  - 骨架.md：在项目 4 核心编码前新增"项目 3.5：UI 设计"，产出 HTML 原型 + Markdown 规范
+  - 编码习惯.md：新增 CHK24（UI 一致性自检）和 F6（设计文件复用）
+  - 规则.md：新增 R19（UI 设计文件为开发前置）和 R20（视觉一致性硬约束）
+
+### Bug 修复批次（Q50 决策后执行）
+
+| Bug # | 描述 | 根因 | 修复 |
+|---|---|---|---|
+| 1 | 点击统计报 `Dropdown.__init__() got an unexpected keyword argument 'on_change'` | Flet 0.86.1 把 `Dropdown.on_change` 改为 `on_select` | `settings_view.py` 4 处 Dropdown 改 `on_select` |
+| 2 | 添加任务后白屏 + 返回黑屏 | 抽屉关闭后 `_overlay.content` 仍引用旧控件，`page.update()` 时引用失效 | 关闭时清 `_overlay.content = None` + 加遮罩点击关闭 |
+| 3 | `ERR_BLOCKED_BY_RESPONSE.NotSameOriginAfterDefaultedToSameOriginByCoep` | Flet 默认 `COEP: require-corp` 阻塞 TRAE 预览器外部脚本 | `main.py` 用 `export_asgi_app=True` + 外层中间件覆盖 COEP 为 `credentialless` |
+| 4 | 折叠子任务 `'NoneType' object has no attribute 'task_id'` | `TaskCard.data` 与 `ft.Control.data` 默认值 None 冲突 | `self.data` → `self._card_data` + `card_data` property，在 `super().__init__()` 之后赋值 |
+| 5 | 任务卡片左右边距不等 | `TaskCard` 固定 `width=360` + 缩进 padding 仅在 left | 移除 `width`，缩进容器 `padding=ft.Padding(left=depth*step, right=depth*step, ...)` |
+| 6 | 点击任务卡片报 `'NoneType' object has no attribute 'task_id'` | 同 Bug 4 | 同 Bug 4 修复 |
+| 7 | 开关任务报 `'NoneType' object has no attribute 'enabled'` | 同 Bug 4 | 同 Bug 4 修复 |
+| 8 | 点击执行报 `'NoneType' object has no attribute 'task_id'` | 同 Bug 4 | 同 Bug 4 修复 |
+| 10 | 点击设置报 Dropdown on_change 错误 | 同 Bug 1 | 同 Bug 1 修复 |
+| 11 | 任务卡片缺删除按钮 | 原设计未要求 | `TaskCard` 加左下角删除按钮 + 二次确认 AlertDialog（与 LogCard 一致） |
+
+需求 9（去掉步骤 tab）、需求 12（设置常驻 AppBar）、需求 13（日志 tab 与任务/统计同级）由 Q50 决策一并实现。
+
+---

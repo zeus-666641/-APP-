@@ -47,16 +47,19 @@ def setup_routes(page: ft.Page) -> None:
         if route == "/tasks":
             page.views.append(HomeView(page))
         elif route == "/step_editor":
+            # 从任务卡片进入步骤编辑器时保留任务列表在栈底
+            page.views.append(HomeView(page))
             page.views.append(StepEditorView(page))
         elif route == "/settings":
+            # Q50：设置从 AppBar 进入，保留任务列表在栈底（点返回回任务列表）
             page.views.append(HomeView(page))
             page.views.append(SettingsView(page))
         elif route == "/stats":
-            # M4 完成：接入真实 StatsView
+            # Q50：统计 tab 直接跳路由，保留任务列表在栈底
             page.views.append(HomeView(page))
             page.views.append(StatsView(page))
         elif route == "/logs":
-            # M5 完成：接入 LogsView
+            # Q50：日志 tab 直接跳路由，保留任务列表在栈底
             page.views.append(HomeView(page))
             page.views.append(LogsView(page))
         else:

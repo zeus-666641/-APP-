@@ -91,13 +91,13 @@ class SettingsView(ft.View):
                                 label="主题模式",
                                 value=str(theme_mode_value),
                                 options=theme_options,
-                                on_change=self._handle_theme_change,
+                                on_select=self._handle_theme_change,
                             ),
                             ft.Dropdown(
                                 label="添加步骤入口",
                                 value=str(add_entry_value),
                                 options=add_entry_options,
-                                on_change=self._handle_add_entry_change,
+                                on_select=self._handle_add_entry_change,
                                 helper_text="默认右上角 AppBar 按钮",
                             ),
 
@@ -112,7 +112,7 @@ class SettingsView(ft.View):
                                 label="拖拽手柄位置",
                                 value=str(handle_side_value),
                                 options=handle_side_options,
-                                on_change=self._handle_handle_side_change,
+                                on_select=self._handle_handle_side_change,
                             ),
                             ft.Switch(
                                 label="显示换位按钮",
@@ -131,7 +131,7 @@ class SettingsView(ft.View):
                                 label="执行失败处理",
                                 value=str(on_failure_value),
                                 options=on_failure_options,
-                                on_change=self._handle_on_failure_change,
+                                on_select=self._handle_on_failure_change,
                             ),
                             ft.TextField(
                                 label="失败重试次数",
@@ -329,5 +329,5 @@ class SettingsView(ft.View):
         set_app_setting("log_keep_count", n)
 
     def _handle_back(self, e: ft.ControlEvent | None = None) -> None:
-        """返回上一页"""
-        self._page.go("/step_editor")
+        """返回任务列表（Q50：设置从 AppBar 进入）"""
+        self._page.go("/tasks")

@@ -79,11 +79,12 @@ class TestHomeViewConstruction:
         nav_bars = [c for c in view.controls if isinstance(c, ft.NavigationBar)]
         assert len(nav_bars) == 1
 
-    def test_nav_bar_has_four_tabs(self):
+    def test_nav_bar_has_three_tabs(self):
+        """Q50: 3 tab（任务/统计/日志）"""
         page = _FakePage()
         view = HomeView(page)  # type: ignore[arg-type]
         nav_bar = next(c for c in view.controls if isinstance(c, ft.NavigationBar))
-        assert len(nav_bar.destinations) == 4
+        assert len(nav_bar.destinations) == 3
 
     def test_default_tab_is_tasks(self):
         page = _FakePage()
@@ -93,31 +94,37 @@ class TestHomeViewConstruction:
 
     def test_initial_tab_can_be_set(self):
         page = _FakePage()
-        view = HomeView(page, initial_tab="stats")  # type: ignore[arg-type]
+        view = HomeView(page, initial_tab="logs")  # type: ignore[arg-type]
         nav_bar = next(c for c in view.controls if isinstance(c, ft.NavigationBar))
-        assert nav_bar.selected_index == 2  # stats
+        assert nav_bar.selected_index == 2  # logs
 
     def test_has_add_task_button(self):
         page = _FakePage()
         view = HomeView(page)  # type: ignore[arg-type]
         appbar = next(c for c in view.controls if isinstance(c, ft.AppBar))
-        assert len(appbar.actions) == 1
+        # Q50：AppBar actions 包含添加任务按钮
+        assert len(appbar.actions) >= 1
+
+    def test_appbar_has_settings_button(self):
+        """Q50 需求12：AppBar 左侧有设置按钮"""
+        page = _FakePage()
+        view = HomeView(page)  # type: ignore[arg-type]
+        appbar = next(c for c in view.controls if isinstance(c, ft.AppBar))
+        assert appbar.leading is not None  # 设置 IconButton 在 leading
 
 
 class TestTabConversion:
-    """tab key 与 index 转换"""
+    """tab key 与 index 转换（Q50: 3 tab）"""
 
     def test_tab_to_index_mapping(self):
         assert HomeView._tab_to_index("tasks") == 0
-        assert HomeView._tab_to_index("steps") == 1
-        assert HomeView._tab_to_index("stats") == 2
-        assert HomeView._tab_to_index("settings") == 3
+        assert HomeView._tab_to_index("stats") == 1
+        assert HomeView._tab_to_index("logs") == 2
 
     def test_index_to_tab_mapping(self):
         assert HomeView._index_to_tab(0) == "tasks"
-        assert HomeView._index_to_tab(1) == "steps"
-        assert HomeView._index_to_tab(2) == "stats"
-        assert HomeView._index_to_tab(3) == "settings"
+        assert HomeView._index_to_tab(1) == "stats"
+        assert HomeView._index_to_tab(2) == "logs"
 
     def test_invalid_index_falls_back_to_tasks(self):
         assert HomeView._index_to_tab(99) == "tasks"
@@ -134,14 +141,13 @@ class TestTabContent:
         safe_area = next(c for c in view.controls if isinstance(c, ft.SafeArea))
         assert safe_area.content is not None
 
-    def test_stats_tab_shows_placeholder(self):
+    def test_tasks_tab_displays_section_title(self):
+        """Q50：任务 tab 显示'全部任务'标题"""
         page = _FakePage()
-        view = HomeView(page, initial_tab="stats")  # type: ignore[arg-type]
+        view = HomeView(page, initial_tab="tasks")  # type: ignore[arg-type]
         safe_area = next(c for c in view.controls if isinstance(c, ft.SafeArea))
-        # M4/M5 完成后 stats tab 显示"执行统计与日志"
         content_text = self._extract_all_text(safe_area)
-        assert "执行统计" in content_text
-        assert "日志" in content_text
+        assert "全部任务" in content_text
 
     def _extract_all_text(self, control) -> str:
         """递归提取所有 Text 内容"""

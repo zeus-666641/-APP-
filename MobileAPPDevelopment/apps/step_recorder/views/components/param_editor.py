@@ -260,7 +260,8 @@ class ParamEditor(ft.Container):
             return _make_int_range_field(f, initial, on_change_handler)
         if f.field_type == FieldType.ENUM:
             dd = _make_enum_field(f, initial)
-            dd.on_change = lambda e: on_change_handler()
+            # Flet 0.86.1: Dropdown 用 on_select（非 on_change）
+            dd.on_select = lambda e: on_change_handler()
             return dd
         # COORDINATE 等未来类型：fallback 到 STRING
         return _make_string_field(f, initial)
