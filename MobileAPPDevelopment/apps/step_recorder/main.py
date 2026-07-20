@@ -20,10 +20,14 @@ def main(page: ft.Page) -> None:
     page.window.width = 400
     page.window.height = 800
 
+    # setup_routes 内部会挂载初始 HomeView（绕过 Flet 0.86 push_route 吞事件 bug）
     setup_routes(page)
-    page.go("/home")
 
 
 if __name__ == "__main__":
-    # 开发期用浏览器预览；发布时改为 ft.AppView.NATIVE
-    ft.app(target=main, view=ft.AppView.WEB_BROWSER)
+    # Flet 0.86 推荐 ft.run()（ft.app() 已废弃）
+    ft.run(
+        main,
+        view=ft.AppView.WEB_BROWSER,
+        web_renderer=ft.WebRenderer.AUTO,
+    )
