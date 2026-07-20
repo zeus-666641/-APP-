@@ -25,8 +25,13 @@ class HomeView(ft.View):
                                 weight=ft.FontWeight.BOLD,
                             ),
                             ft.Text("v0.1.0", size=12, color=ft.colors.ON_SURFACE_VARIANT),
-                            ft.ElevatedButton(
-                                text="设置",
+                            ft.Button(
+                                "步骤编辑器",
+                                icon=ft.icons.LIST_ALT,
+                                on_click=lambda _: page.go("/step_editor"),
+                            ),
+                            ft.Button(
+                                "设置",
                                 icon=ft.icons.SETTINGS,
                                 on_click=lambda _: page.go("/settings"),
                             ),

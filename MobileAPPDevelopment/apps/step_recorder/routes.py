@@ -6,6 +6,7 @@ import flet as ft
 
 from views.home_view import HomeView
 from views.settings_view import SettingsView
+from views.step_editor_view import StepEditorView
 
 
 def setup_routes(page: ft.Page) -> None:
@@ -22,6 +23,9 @@ def setup_routes(page: ft.Page) -> None:
         elif e.route == "/settings":
             page.views.append(HomeView(page))
             page.views.append(SettingsView(page))
+        elif e.route == "/step_editor":
+            page.views.append(HomeView(page))
+            page.views.append(StepEditorView(page))
         page.update()
 
     def view_pop(e: ft.ViewPopEvent) -> None:

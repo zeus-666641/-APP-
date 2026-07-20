@@ -187,3 +187,35 @@
 - **影响**：T2.7 step_editor_view 返回时检测 dirty 状态，弹 AlertDialog 让用户三选一；param_editor 暴露 `is_dirty()` + `get_values()` 方法供 view 层调用
 
 ---
+
+## 2026-07-20 续2（M2-T2.7 step_editor_view 设计）
+
+### Q21. 步骤编辑模式展开方式
+- **问题**：点击 StepCard 或 + 按钮编辑步骤时，以什么方式展开编辑界面？
+- **选项**：
+  1. 抽屉式侧滑（从右滑出宽度 80%，含 StepTypePicker + ParamEditor）
+  2. 全屏对话框
+  3. 独立全屏页
+  4. BottomSheet
+- **用户选择**：选 1 抽屉式侧滑
+- **影响**：用 ft.PageOverlay 或自定义 ft.Container + transform animation 实现抽屉；编辑时不遮挡步骤列表（用户能看到上下文）
+
+### Q22. 添加步骤入口
+- **问题**：添加步骤的入口位置？
+- **选项**：
+  1. 右下角 FAB（FloatingActionButton，符合手机习惯）
+  2. 顶部按钮（PRD HTML 原始设计）
+  3. 双入口（FAB 默认 + 顶部按钮，都启动添加流程）
+- **用户选择**：选 3 双入口（默认 FAB，但顶部按钮也要实现）
+- **影响**：step_editor_view 同时渲染 FAB 和顶部"添加步骤"按钮，二者调用同一个 add_step_handler；未来可在设置中切换默认
+
+### Q23. T2.7 首跑数据源
+- **问题**：M0 数据模型未实现，T2.7 首跑时数据从哪里来？
+- **选项**：
+  1. mock 3-5 条示例步骤（hardcode 在 view 内部，覆盖 AVAILABLE/LIMITED/NOT_IMPLEMENTED 三种状态）
+  2. 空状态 + 引导文案
+  3. 直接调用 services/storage.py（未实现，会报错）
+- **用户选择**：选 1 mock 3-5 条示例步骤
+- **影响**：step_editor_view 内置 `_default_mock_steps()` 返回 list[StepCardData]，覆盖 OPEN_URL/DELAY/DARK_MODE/BLUETOOTH(VISIBLE_NOT_IMPL)/CLICK 等代表性类型
+
+---
