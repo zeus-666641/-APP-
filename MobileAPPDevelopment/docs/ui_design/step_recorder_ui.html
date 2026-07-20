@@ -1,0 +1,1395 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>step_recorder UI 原型</title>
+<style>
+  /* ===== Design Tokens（与 ui_design_spec.md 一致） ===== */
+  :root {
+    --accent: #2563eb;
+    --accent-light: #dbeafe;
+    --ink: #1a1a2e;
+    --muted: #6b7280;
+    --rule: #e5e7eb;
+    --bg2: #ffffff;
+    --danger: #ef4444;
+    --success: #10b981;
+    --warning: #f59e0b;
+    --disabled: #94a3b8;
+    --bg-page: #f9fafb;
+    --bg-hover: #f3f4f6;
+    --bg-error: #fef2f2;
+
+    --fs-title-lg: 18px;
+    --fs-title: 16px;
+    --fs-body-strong: 14px;
+    --fs-body: 13px;
+    --fs-meta: 12px;
+    --fs-caption: 11px;
+    --fs-micro: 10px;
+
+    --sp-page-x: 16px;
+    --sp-card-x: 12px;
+    --sp-card-y-top: 10px;
+    --sp-card-y-bottom: 8px;
+    --sp-list-gap: 8px;
+    --sp-section-y: 8px;
+    --sp-indent-step: 24px;
+    --sp-icon-text: 8px;
+
+    --br-card: 10px;
+    --br-icon-block: 8px;
+    --br-badge: 4px;
+    --br-button: 8px;
+
+    --size-icon-block: 36px;
+    --size-status-dot: 8px;
+    --size-app-width: 400px;
+    --size-app-height: 800px;
+  }
+
+  /* ===== 基础重置 ===== */
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: "PingFang SC", "Microsoft YaHei", -apple-system, sans-serif;
+    background: #e5e7eb;
+    color: var(--ink);
+    padding: 24px;
+  }
+  h1 { font-size: 20px; margin-bottom: 16px; color: var(--ink); }
+  h2 { font-size: 16px; margin: 24px 0 12px; color: var(--ink); border-bottom: 1px solid var(--rule); padding-bottom: 6px; }
+
+  /* ===== 屏幕预览容器 ===== */
+  .screens-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(420px, 1fr));
+    gap: 24px;
+  }
+  .screen-wrap {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+  .screen-label {
+    font-size: 13px;
+    color: var(--muted);
+    margin-bottom: 8px;
+    font-weight: 600;
+  }
+  .phone {
+    width: var(--size-app-width);
+    height: var(--size-app-height);
+    background: var(--bg-page);
+    border-radius: 24px;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.12);
+    border: 8px solid #1f2937;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    position: relative;
+  }
+
+  /* ===== AppBar ===== */
+  .appbar {
+    background: var(--accent);
+    color: white;
+    height: 56px;
+    display: flex;
+    align-items: center;
+    padding: 0 8px 0 4px;
+    gap: 4px;
+  }
+  .appbar .icon-btn {
+    width: 40px; height: 40px;
+    display: flex; align-items: center; justify-content: center;
+    color: white;
+    cursor: pointer;
+    border-radius: 50%;
+    font-size: 22px;
+  }
+  .appbar .icon-btn:hover { background: rgba(255,255,255,0.1); }
+  .appbar .title { flex: 1; font-size: var(--fs-title-lg); font-weight: 600; padding-left: 4px; }
+  .appbar .add-btn {
+    background: white; color: var(--accent);
+    border: none;
+    padding: 6px 12px;
+    border-radius: 20px;
+    font-size: var(--fs-meta);
+    font-weight: 600;
+    cursor: pointer;
+    display: flex; align-items: center; gap: 4px;
+  }
+  .appbar .add-btn:hover { background: #f3f4f6; }
+
+  /* ===== SafeArea 内容区 ===== */
+  .safe-area {
+    flex: 1;
+    overflow-y: auto;
+    padding: 0;
+  }
+
+  /* ===== section-title ===== */
+  .section-title {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 8px var(--sp-page-x) 4px;
+  }
+  .section-title .title { font-size: var(--fs-body-strong); font-weight: 600; color: var(--ink); }
+  .section-title .count { font-size: var(--fs-meta); color: var(--muted); }
+
+  /* ===== TaskCard ===== */
+  .card-list { padding: 0 var(--sp-page-x) 16px; display: flex; flex-direction: column; gap: var(--sp-list-gap); }
+  .task-card {
+    background: var(--bg2);
+    border: 1px solid var(--rule);
+    border-radius: var(--br-card);
+    padding: var(--sp-card-y-top) var(--sp-card-x) var(--sp-card-y-bottom);
+  }
+  .task-card:hover { background: var(--bg-hover); }
+  .task-card .main-row {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-icon-text);
+  }
+  .icon-block {
+    width: var(--size-icon-block); height: var(--size-icon-block);
+    background: var(--accent-light);
+    border-radius: var(--br-icon-block);
+    display: flex; align-items: center; justify-content: center;
+    color: var(--accent);
+    font-size: 18px;
+    flex-shrink: 0;
+  }
+  .info-col { flex: 1; min-width: 0; }
+  .name-row {
+    display: flex; align-items: center; gap: 6px;
+  }
+  .task-name {
+    font-size: var(--fs-body-strong);
+    font-weight: 600;
+    color: var(--ink);
+    flex: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .task-name.disabled { color: var(--muted); }
+  .status-dot {
+    width: var(--size-status-dot); height: var(--size-status-dot);
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+  .status-text { font-size: var(--fs-micro); font-weight: 500; flex-shrink: 0; }
+  .actions-row {
+    display: flex; align-items: center; gap: 2px;
+  }
+  .icon-action {
+    width: 32px; height: 32px;
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer;
+    border-radius: 50%;
+    font-size: 14px;
+  }
+  .icon-action.accent { color: var(--accent); }
+  .icon-action.muted { color: var(--muted); }
+  .icon-action:hover { background: var(--rule); }
+
+  /* ===== 开关 ===== */
+  .switch {
+    width: 32px; height: 18px;
+    background: var(--accent);
+    border-radius: 9px;
+    position: relative;
+    cursor: pointer;
+  }
+  .switch::after {
+    content: '';
+    position: absolute;
+    width: 14px; height: 14px;
+    background: white;
+    border-radius: 50%;
+    top: 2px; right: 2px;
+    transition: 0.2s;
+  }
+  .switch.off { background: var(--disabled); }
+  .switch.off::after { right: 16px; }
+
+  /* ===== 删除按钮（左下角） ===== */
+  .footer-row {
+    display: flex;
+    align-items: center;
+    margin-top: 8px;
+  }
+  .delete-btn {
+    color: var(--danger);
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 4px;
+    font-size: var(--fs-meta);
+    display: flex; align-items: center; gap: 4px;
+  }
+  .delete-btn:hover { background: var(--bg-error); border-radius: 4px; }
+
+  /* ===== 缩进（任务树） ===== */
+  .indent-1 { padding-left: var(--sp-indent-step); padding-right: var(--sp-indent-step); }
+
+  /* ===== NavigationBar ===== */
+  .nav-bar {
+    height: 56px;
+    background: var(--bg2);
+    border-top: 1px solid var(--rule);
+    display: flex;
+    align-items: center;
+    justify-content: space-around;
+  }
+  .nav-item {
+    display: flex; flex-direction: column; align-items: center;
+    gap: 2px;
+    color: var(--muted);
+    cursor: pointer;
+    font-size: var(--fs-micro);
+    padding: 8px 16px;
+  }
+  .nav-item.active { color: var(--accent); }
+  .nav-item .icon { font-size: 24px; }
+
+  /* ===== 统计卡片 ===== */
+  .stats-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; padding: 0 var(--sp-page-x); }
+  .stat-card {
+    background: var(--bg2);
+    border: 1px solid var(--rule);
+    border-radius: var(--br-card);
+    padding: 12px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .stat-card .icon-block { width: 36px; height: 36px; font-size: 20px; }
+  .stat-card .label { font-size: var(--fs-caption); color: var(--muted); }
+  .stat-card .value { font-size: var(--fs-title); font-weight: 600; color: var(--ink); }
+
+  /* ===== 任务排行 ===== */
+  .rank-row {
+    background: var(--bg2);
+    border: 1px solid var(--rule);
+    border-radius: 8px;
+    padding: 8px 12px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 4px;
+  }
+  .rank-badge {
+    width: 24px; height: 24px;
+    background: var(--accent);
+    color: white;
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: var(--fs-meta);
+    font-weight: 600;
+    flex-shrink: 0;
+  }
+  .rank-badge.muted { background: var(--muted); }
+  .rank-info { flex: 1; min-width: 0; }
+  .rank-name { font-size: var(--fs-body); font-weight: 500; color: var(--ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .rank-meta { font-size: var(--fs-caption); color: var(--muted); }
+  .rank-bar {
+    width: 60px; height: 6px;
+    background: var(--rule);
+    border-radius: 3px;
+    flex-shrink: 0;
+    overflow: hidden;
+  }
+  .rank-bar .fill { height: 100%; background: var(--success); border-radius: 3px; }
+
+  /* ===== 每日柱状图 ===== */
+  .chart {
+    background: var(--bg2);
+    border: 1px solid var(--rule);
+    border-radius: var(--br-card);
+    margin: 0 var(--sp-page-x);
+    padding: 8px 16px 16px;
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-end;
+    height: 140px;
+  }
+  .chart-bar {
+    display: flex; flex-direction: column; align-items: center; gap: 4px;
+    flex: 1;
+  }
+  .chart-bar .count { font-size: var(--fs-micro); color: var(--muted); }
+  .chart-bar .bar {
+    width: 24px;
+    background: var(--accent);
+    border-radius: 4px;
+  }
+  .chart-bar .bar.empty { background: var(--rule); }
+  .chart-bar .date { font-size: 9px; color: var(--muted); }
+
+  /* ===== 触发源分布 ===== */
+  .trigger-row {
+    padding: 8px 12px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .trigger-label { width: 80px; font-size: var(--fs-meta); color: var(--ink); }
+  .trigger-bar {
+    width: 120px; height: 8px;
+    background: var(--rule);
+    border-radius: 4px;
+    overflow: hidden;
+  }
+  .trigger-bar .fill { height: 100%; background: var(--accent); }
+  .trigger-meta { font-size: var(--fs-caption); color: var(--muted); }
+
+  /* ===== 日志卡片 ===== */
+  .log-card {
+    background: var(--bg2);
+    border: 1px solid var(--rule);
+    border-radius: var(--br-card);
+    padding: var(--sp-card-y-top) var(--sp-card-x) var(--sp-card-y-bottom);
+    margin-bottom: var(--sp-list-gap);
+  }
+  .log-card .name-row { margin-bottom: 8px; }
+  .badge {
+    color: white;
+    background: var(--success);
+    padding: 2px 6px;
+    border-radius: var(--br-badge);
+    font-size: var(--fs-micro);
+    font-weight: 600;
+  }
+  .badge.danger { background: var(--danger); }
+  .badge.muted { background: var(--muted); }
+  .badge.warning { background: var(--warning); }
+  .meta-row {
+    display: flex; align-items: center; gap: 8px;
+    margin-bottom: 8px;
+  }
+  .meta-tag {
+    background: var(--rule);
+    color: var(--muted);
+    padding: 2px 6px;
+    border-radius: var(--br-badge);
+    font-size: var(--fs-caption);
+  }
+  .meta-text { font-size: var(--fs-caption); color: var(--muted); }
+  .error-block {
+    background: var(--bg-error);
+    color: var(--danger);
+    padding: 4px 8px;
+    border-radius: var(--br-badge);
+    font-size: var(--fs-caption);
+    margin-bottom: 8px;
+  }
+
+  /* ===== 搜索框 + 过滤器 ===== */
+  .search-field {
+    padding: 8px var(--sp-page-x) 4px;
+  }
+  .search-input {
+    width: 100%;
+    padding: 8px 12px;
+    border: 1px solid var(--rule);
+    border-radius: var(--br-button);
+    font-size: var(--fs-body);
+    background: var(--bg2);
+  }
+  .filter-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+    padding: 0 var(--sp-page-x) 4px;
+    margin-bottom: 4px;
+  }
+  .dropdown-mock {
+    padding: 6px 10px;
+    border: 1px solid var(--rule);
+    border-radius: var(--br-button);
+    font-size: var(--fs-meta);
+    color: var(--ink);
+    background: var(--bg2);
+    display: flex; justify-content: space-between; align-items: center;
+  }
+  .segmented {
+    display: flex;
+    margin: 0 var(--sp-page-x) 8px;
+    border: 1px solid var(--rule);
+    border-radius: var(--br-button);
+    overflow: hidden;
+  }
+  .segmented > div {
+    flex: 1;
+    padding: 6px;
+    text-align: center;
+    font-size: var(--fs-meta);
+    color: var(--muted);
+    cursor: pointer;
+  }
+  .segmented > div.active {
+    background: var(--accent);
+    color: white;
+  }
+
+  /* ===== 时间轴 ===== */
+  .timeline {
+    padding: 0 var(--sp-page-x);
+    position: relative;
+  }
+  .timeline::before {
+    content: '';
+    position: absolute;
+    left: 32px; top: 8px; bottom: 8px;
+    width: 2px;
+    background: var(--rule);
+  }
+  .timeline-node {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 12px;
+    position: relative;
+  }
+  .timeline-num {
+    width: 24px; height: 24px;
+    background: var(--accent-light);
+    color: var(--accent);
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: var(--fs-meta);
+    font-weight: 600;
+    z-index: 1;
+    flex-shrink: 0;
+  }
+  .timeline-info { flex: 1; min-width: 0; }
+  .timeline-name { font-size: var(--fs-body); font-weight: 500; color: var(--ink); }
+  .timeline-meta { font-size: var(--fs-caption); color: var(--muted); }
+
+  /* ===== 设置页 ===== */
+  .settings-section { padding: 12px var(--sp-page-x); }
+  .settings-row {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 12px 0;
+    border-bottom: 1px solid var(--rule);
+  }
+  .settings-row:last-child { border-bottom: none; }
+  .settings-label { font-size: var(--fs-body); color: var(--ink); }
+  .settings-value { font-size: var(--fs-meta); color: var(--muted); }
+
+  /* ===== Drawer（抽屉示意） ===== */
+  .drawer-overlay {
+    position: absolute;
+    inset: 0;
+    background: rgba(0,0,0,0.5);
+    display: flex;
+    justify-content: flex-end;
+  }
+  .drawer {
+    width: 320px;
+    background: var(--bg2);
+    padding: 16px;
+    overflow-y: auto;
+  }
+  .drawer-title { display: flex; align-items: center; gap: 8px; margin-bottom: 16px; }
+  .drawer-title .icon { color: var(--accent); font-size: 24px; }
+  .drawer-title .text { font-size: var(--fs-title-lg); font-weight: 600; color: var(--ink); }
+  .form-field { margin-bottom: 12px; }
+  .form-label { font-size: var(--fs-meta); color: var(--muted); margin-bottom: 4px; display: block; }
+  .form-input {
+    width: 100%;
+    padding: 8px 12px;
+    border: 1px solid var(--rule);
+    border-radius: var(--br-button);
+    font-size: var(--fs-body);
+    background: var(--bg2);
+  }
+  .icon-grid {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 4px;
+    margin: 8px 0;
+  }
+  .icon-cell {
+    aspect-ratio: 1;
+    display: flex; align-items: center; justify-content: center;
+    border: 1px solid var(--rule);
+    border-radius: var(--br-button);
+    color: var(--muted);
+    cursor: pointer;
+  }
+  .icon-cell.selected {
+    background: var(--accent-light);
+    border-color: var(--accent);
+    color: var(--accent);
+  }
+  .btn-row { display: flex; justify-content: flex-end; gap: 8px; margin-top: 16px; }
+  .btn {
+    padding: 6px 16px;
+    border-radius: 20px;
+    border: none;
+    cursor: pointer;
+    font-size: var(--fs-meta);
+    font-weight: 600;
+  }
+  .btn-primary { background: var(--accent); color: white; }
+  .btn-danger { background: var(--danger); color: white; }
+  .btn-ghost { background: none; color: var(--muted); }
+
+  /* ===== AlertDialog ===== */
+  .dialog-overlay {
+    position: absolute;
+    inset: 0;
+    background: rgba(0,0,0,0.5);
+    display: flex; align-items: center; justify-content: center;
+  }
+  .dialog {
+    background: var(--bg2);
+    border-radius: var(--br-card);
+    padding: 24px;
+    width: 320px;
+    text-align: center;
+  }
+  .dialog h3 { font-size: var(--fs-title-lg); margin-bottom: 12px; }
+  .dialog p { font-size: var(--fs-body); color: var(--muted); margin-bottom: 16px; }
+  .dialog-actions { display: flex; gap: 8px; justify-content: center; }
+
+  /* ===== 空状态 ===== */
+  .empty-state {
+    text-align: center;
+    padding: 60px 16px;
+    color: var(--muted);
+  }
+  .empty-state .icon { font-size: 48px; margin-bottom: 8px; color: var(--muted); }
+  .empty-state .title { font-size: var(--fs-body-strong); margin-bottom: 4px; }
+  .empty-state .desc { font-size: var(--fs-meta); }
+
+  /* ===== Tab 切换 ===== */
+  .tabs {
+    margin-bottom: 24px;
+    display: flex;
+    gap: 8px;
+    border-bottom: 1px solid var(--rule);
+    padding-bottom: 8px;
+  }
+  .tabs a {
+    color: var(--muted);
+    text-decoration: none;
+    padding: 4px 12px;
+    font-size: var(--fs-meta);
+  }
+</style>
+</head>
+<body>
+
+<h1>step_recorder UI 设计原型</h1>
+<p style="font-size:13px; color:#6b7280; margin-bottom:16px;">
+  配套规范：<code>ui_design_spec.md</code> · 基于 Flet 0.86 实现 · 400×800 移动端竖屏
+</p>
+
+<div class="tabs">
+  <a href="#pages">页面</a>
+  <a href="#components">组件</a>
+  <a href="#states">状态</a>
+</div>
+
+<h2 id="pages">页面原型</h2>
+<div class="screens-grid">
+
+  <!-- ========== /tasks 任务列表 ========== -->
+  <div class="screen-wrap">
+    <div class="screen-label">/tasks · 任务列表（默认首屏）</div>
+    <div class="phone">
+      <div class="appbar">
+        <div class="icon-btn">⚙</div>
+        <div class="title">任务管理</div>
+        <button class="add-btn">+ 添加任务</button>
+      </div>
+      <div class="safe-area">
+        <div class="section-title">
+          <span class="title">全部任务</span>
+          <span class="count">共 5 项</span>
+        </div>
+        <div class="card-list">
+          <!-- 任务 1：根任务，启用，空闲 -->
+          <div class="task-card">
+            <div class="main-row">
+              <div class="icon-block">☀</div>
+              <div class="info-col">
+                <div class="name-row">
+                  <span class="task-name">早晨例行程序</span>
+                  <span class="status-dot" style="background:var(--muted);"></span>
+                  <span class="status-text" style="color:var(--muted);">空闲</span>
+                </div>
+              </div>
+              <div class="actions-row">
+                <div class="icon-action accent">▶</div>
+                <div class="switch"></div>
+                <div class="icon-action muted">▼</div>
+              </div>
+            </div>
+            <div class="footer-row">
+              <button class="delete-btn">🗑 删除</button>
+            </div>
+          </div>
+
+          <!-- 任务 1.1：子任务（缩进 1 层） -->
+          <div class="indent-1">
+            <div class="task-card">
+              <div class="main-row">
+                <div class="icon-block">⏻</div>
+                <div class="info-col">
+                  <div class="name-row">
+                    <span class="task-name">开机检查</span>
+                    <span class="status-dot" style="background:var(--muted);"></span>
+                    <span class="status-text" style="color:var(--muted);">空闲</span>
+                  </div>
+                </div>
+                <div class="actions-row">
+                  <div class="icon-action accent">▶</div>
+                  <div class="switch"></div>
+                </div>
+              </div>
+              <div class="footer-row">
+                <button class="delete-btn">🗑 删除</button>
+              </div>
+            </div>
+          </div>
+
+          <!-- 任务 2：禁用 -->
+          <div class="task-card">
+            <div class="main-row">
+              <div class="icon-block">🎮</div>
+              <div class="info-col">
+                <div class="name-row">
+                  <span class="task-name disabled">娱乐时间</span>
+                  <span class="status-dot" style="background:var(--disabled);"></span>
+                  <span class="status-text" style="color:var(--disabled);">已禁用</span>
+                </div>
+              </div>
+              <div class="actions-row">
+                <div class="icon-action accent">▶</div>
+                <div class="switch off"></div>
+              </div>
+            </div>
+            <div class="footer-row">
+              <button class="delete-btn">🗑 删除</button>
+            </div>
+          </div>
+
+          <!-- 任务 3：执行中 -->
+          <div class="task-card">
+            <div class="main-row">
+              <div class="icon-block">💼</div>
+              <div class="info-col">
+                <div class="name-row">
+                  <span class="task-name">工作日报生成</span>
+                  <span class="status-dot" style="background:var(--accent);"></span>
+                  <span class="status-text" style="color:var(--accent);">执行中</span>
+                </div>
+              </div>
+              <div class="actions-row">
+                <div class="icon-action accent">▶</div>
+                <div class="switch"></div>
+                <div class="icon-action muted">▼</div>
+              </div>
+            </div>
+            <div class="footer-row">
+              <button class="delete-btn">🗑 删除</button>
+            </div>
+          </div>
+
+          <!-- 任务 4：出错 -->
+          <div class="task-card">
+            <div class="main-row">
+              <div class="icon-block">⚙</div>
+              <div class="info-col">
+                <div class="name-row">
+                  <span class="task-name">系统优化</span>
+                  <span class="status-dot" style="background:var(--danger);"></span>
+                  <span class="status-text" style="color:var(--danger);">出错</span>
+                </div>
+              </div>
+              <div class="actions-row">
+                <div class="icon-action accent">▶</div>
+                <div class="switch"></div>
+              </div>
+            </div>
+            <div class="footer-row">
+              <button class="delete-btn">🗑 删除</button>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="nav-bar">
+        <div class="nav-item active"><div class="icon">☑</div>任务</div>
+        <div class="nav-item"><div class="icon">📊</div>统计</div>
+        <div class="nav-item"><div class="icon">📋</div>日志</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ========== /stats 统计页 ========== -->
+  <div class="screen-wrap">
+    <div class="screen-label">/stats · 执行统计</div>
+    <div class="phone">
+      <div class="appbar">
+        <div class="icon-btn">←</div>
+        <div class="title">执行统计</div>
+      </div>
+      <div class="safe-area">
+        <div class="section-title">
+          <span class="title">汇总统计</span>
+        </div>
+        <div class="stats-grid">
+          <div class="stat-card">
+            <div class="icon-block" style="color:var(--accent);">▶</div>
+            <div>
+              <div class="label">总执行次数</div>
+              <div class="value">128</div>
+            </div>
+          </div>
+          <div class="stat-card">
+            <div class="icon-block" style="color:var(--success);">✓</div>
+            <div>
+              <div class="label">成功率</div>
+              <div class="value">87.5%</div>
+            </div>
+          </div>
+          <div class="stat-card">
+            <div class="icon-block" style="color:var(--warning);">⏱</div>
+            <div>
+              <div class="label">平均时长</div>
+              <div class="value">3.2s</div>
+            </div>
+          </div>
+          <div class="stat-card">
+            <div class="icon-block" style="color:var(--accent);">📋</div>
+            <div>
+              <div class="label">任务数</div>
+              <div class="value">8</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="section-title">
+          <span class="title">任务排行</span>
+          <span class="count">Top 5</span>
+        </div>
+        <div class="card-list">
+          <div class="rank-row">
+            <div class="rank-badge">1</div>
+            <div class="rank-info">
+              <div class="rank-name">早晨例行程序</div>
+              <div class="rank-meta">执行 32 次 · 成功率 95%</div>
+            </div>
+            <div class="rank-bar"><div class="fill" style="width:95%;"></div></div>
+          </div>
+          <div class="rank-row">
+            <div class="rank-badge">2</div>
+            <div class="rank-info">
+              <div class="rank-name">工作日报生成</div>
+              <div class="rank-meta">执行 28 次 · 成功率 89%</div>
+            </div>
+            <div class="rank-bar"><div class="fill" style="width:89%;"></div></div>
+          </div>
+          <div class="rank-row">
+            <div class="rank-badge">3</div>
+            <div class="rank-info">
+              <div class="rank-name">学习计划</div>
+              <div class="rank-meta">执行 24 次 · 成功率 92%</div>
+            </div>
+            <div class="rank-bar"><div class="fill" style="width:92%;"></div></div>
+          </div>
+          <div class="rank-row">
+            <div class="rank-badge muted">4</div>
+            <div class="rank-info">
+              <div class="rank-name">系统优化</div>
+              <div class="rank-meta">执行 22 次 · 成功率 73%</div>
+            </div>
+            <div class="rank-bar"><div class="fill" style="width:73%;background:var(--warning);"></div></div>
+          </div>
+        </div>
+
+        <div class="section-title">
+          <span class="title">最近 7 天</span>
+          <span class="count">47 次</span>
+        </div>
+        <div class="chart">
+          <div class="chart-bar"><span class="count">5</span><div class="bar" style="height:25px;"></div><span class="date">07-14</span></div>
+          <div class="chart-bar"><span class="count">8</span><div class="bar" style="height:40px;"></div><span class="date">07-15</span></div>
+          <div class="chart-bar"><span class="count">12</span><div class="bar" style="height:60px;"></div><span class="date">07-16</span></div>
+          <div class="chart-bar"><span class="count">4</span><div class="bar" style="height:20px;"></div><span class="date">07-17</span></div>
+          <div class="chart-bar"><span class="count">10</span><div class="bar" style="height:50px;"></div><span class="date">07-18</span></div>
+          <div class="chart-bar"><span class="count">0</span><div class="bar empty" style="height:4px;"></div><span class="date">07-19</span></div>
+          <div class="chart-bar"><span class="count">8</span><div class="bar" style="height:40px;"></div><span class="date">07-20</span></div>
+        </div>
+
+        <div class="section-title">
+          <span class="title">按触发源</span>
+        </div>
+        <div class="card-list">
+          <div class="trigger-row">
+            <span class="trigger-label">手动触发</span>
+            <div class="trigger-bar"><div class="fill" style="width:60%;"></div></div>
+            <span class="trigger-meta">28 次 (60%)</span>
+          </div>
+          <div class="trigger-row">
+            <span class="trigger-label">定时触发</span>
+            <div class="trigger-bar"><div class="fill" style="width:25%;"></div></div>
+            <span class="trigger-meta">12 次 (26%)</span>
+          </div>
+          <div class="trigger-row">
+            <span class="trigger-label">间隔触发</span>
+            <div class="trigger-bar"><div class="fill" style="width:10%;"></div></div>
+            <span class="trigger-meta">5 次 (11%)</span>
+          </div>
+          <div class="trigger-row">
+            <span class="trigger-label">随机触发</span>
+            <div class="trigger-bar"><div class="fill" style="width:4%;"></div></div>
+            <span class="trigger-meta">2 次 (4%)</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ========== /logs 日志列表 ========== -->
+  <div class="screen-wrap">
+    <div class="screen-label">/logs · 执行日志列表</div>
+    <div class="phone">
+      <div class="appbar">
+        <div class="icon-btn">←</div>
+        <div class="title">执行日志</div>
+      </div>
+      <div class="safe-area">
+        <div class="search-field">
+          <input class="search-input" placeholder="搜索任务名或日志 ID" />
+        </div>
+        <div class="filter-row">
+          <div class="dropdown-mock">全部状态 <span>▾</span></div>
+          <div class="dropdown-mock">全部触发源 <span>▾</span></div>
+        </div>
+        <div class="filter-row">
+          <div class="dropdown-mock">全部任务 <span>▾</span></div>
+          <div class="dropdown-mock">全部 <span>▾</span></div>
+        </div>
+        <div class="segmented">
+          <div class="active">按日期</div>
+          <div>平铺</div>
+        </div>
+        <div class="section-title">
+          <span class="title">执行日志</span>
+          <span class="count">共 6 项</span>
+        </div>
+        <div class="card-list">
+          <div style="padding:8px 4px 4px;font-size:12px;color:var(--muted);font-weight:600;">今天 · 2 项</div>
+
+          <div class="log-card">
+            <div class="name-row">
+              <div class="icon-block">☀</div>
+              <div class="info-col">
+                <div style="font-size:14px;font-weight:600;color:var(--ink);">早晨例行程序</div>
+                <div style="font-size:11px;color:var(--muted);">5 个步骤</div>
+              </div>
+              <span class="badge">成功</span>
+            </div>
+            <div class="meta-row">
+              <span class="meta-tag">手动触发</span>
+              <span class="meta-text">2 分钟前</span>
+              <span class="meta-text">3.5s</span>
+            </div>
+            <div class="footer-row">
+              <button class="delete-btn">🗑 删除</button>
+            </div>
+          </div>
+
+          <div class="log-card">
+            <div class="name-row">
+              <div class="icon-block">⚙</div>
+              <div class="info-col">
+                <div style="font-size:14px;font-weight:600;color:var(--ink);">系统优化</div>
+                <div style="font-size:11px;color:var(--muted);">8 个步骤</div>
+              </div>
+              <span class="badge danger">失败</span>
+            </div>
+            <div class="meta-row">
+              <span class="meta-tag">定时触发</span>
+              <span class="meta-text">1 小时前</span>
+              <span class="meta-text">12.3s</span>
+            </div>
+            <div class="error-block">步骤 4 失败：无法获取 root 权限</div>
+            <div class="footer-row">
+              <button class="delete-btn">🗑 删除</button>
+            </div>
+          </div>
+
+          <div style="padding:8px 4px 4px;font-size:12px;color:var(--muted);font-weight:600;">昨天 · 1 项</div>
+
+          <div class="log-card">
+            <div class="name-row">
+              <div class="icon-block">💼</div>
+              <div class="info-col">
+                <div style="font-size:14px;font-weight:600;color:var(--ink);">工作日报生成</div>
+                <div style="font-size:11px;color:var(--muted);">6 个步骤</div>
+              </div>
+              <span class="badge">成功</span>
+            </div>
+            <div class="meta-row">
+              <span class="meta-tag">间隔触发</span>
+              <span class="meta-text">昨天 18:00</span>
+              <span class="meta-text">5.2s</span>
+            </div>
+            <div class="footer-row">
+              <button class="delete-btn">🗑 删除</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ========== /logs/{id} 日志详情 ========== -->
+  <div class="screen-wrap">
+    <div class="screen-label">/logs/{id} · 日志详情（时间轴）</div>
+    <div class="phone">
+      <div class="appbar">
+        <div class="icon-btn">←</div>
+        <div class="title">早晨例行程序</div>
+      </div>
+      <div class="safe-area">
+        <div class="section-title">
+          <span class="title">概览</span>
+        </div>
+        <div class="card-list">
+          <div class="stat-card" style="flex-direction:column;align-items:flex-start;gap:8px;padding:16px;">
+            <div style="display:flex;gap:8px;align-items:center;">
+              <div class="icon-block">☀</div>
+              <div>
+                <div style="font-size:14px;font-weight:600;">早晨例行程序</div>
+                <div style="font-size:11px;color:var(--muted);">log_20260720_001</div>
+              </div>
+              <span class="badge" style="margin-left:auto;">成功</span>
+            </div>
+            <div style="display:flex;gap:16px;font-size:12px;color:var(--muted);">
+              <span>开始：2026-07-20 09:00</span>
+              <span>耗时：3.5s</span>
+            </div>
+            <div style="display:flex;gap:8px;">
+              <span class="meta-tag">手动触发</span>
+              <span class="meta-tag">5 个步骤</span>
+            </div>
+          </div>
+        </div>
+        <div class="section-title">
+          <span class="title">执行步骤</span>
+        </div>
+        <div class="timeline" style="padding-bottom:16px;">
+          <div class="timeline-node">
+            <div class="timeline-num">1</div>
+            <div class="timeline-info">
+              <div class="timeline-name">打开应用</div>
+              <div class="timeline-meta">✓ 成功 · 0.5s</div>
+            </div>
+          </div>
+          <div class="timeline-node">
+            <div class="timeline-num">2</div>
+            <div class="timeline-info">
+              <div class="timeline-name">检查网络</div>
+              <div class="timeline-meta">✓ 成功 · 0.3s</div>
+            </div>
+          </div>
+          <div class="timeline-node">
+            <div class="timeline-num">3</div>
+            <div class="timeline-info">
+              <div class="timeline-name">同步数据</div>
+              <div class="timeline-meta">✓ 成功 · 1.2s</div>
+            </div>
+          </div>
+          <div class="timeline-node">
+            <div class="timeline-num">4</div>
+            <div class="timeline-info">
+              <div class="timeline-name">关闭弹窗</div>
+              <div class="timeline-meta">✓ 成功 · 0.8s</div>
+            </div>
+          </div>
+          <div class="timeline-node">
+            <div class="timeline-num">5</div>
+            <div class="timeline-info">
+              <div class="timeline-name">保存状态</div>
+              <div class="timeline-meta">✓ 成功 · 0.7s</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ========== /settings 设置 ========== -->
+  <div class="screen-wrap">
+    <div class="screen-label">/settings · 设置</div>
+    <div class="phone">
+      <div class="appbar">
+        <div class="icon-btn">←</div>
+        <div class="title">设置</div>
+      </div>
+      <div class="safe-area">
+        <div class="settings-section">
+          <div style="font-size:14px;font-weight:600;color:var(--accent);margin-bottom:8px;">显示设置</div>
+          <div class="settings-row">
+            <span class="settings-label">主题模式</span>
+            <span class="settings-value">跟随系统 ▾</span>
+          </div>
+          <div class="settings-row">
+            <span class="settings-label">添加步骤入口</span>
+            <span class="settings-value">仅右上角 ▾</span>
+          </div>
+        </div>
+        <div class="settings-section">
+          <div style="font-size:14px;font-weight:600;color:var(--accent);margin-bottom:8px;">列表交互</div>
+          <div class="settings-row">
+            <span class="settings-label">显示拖拽手柄</span>
+            <div class="switch"></div>
+          </div>
+          <div class="settings-row">
+            <span class="settings-label">拖拽手柄位置</span>
+            <span class="settings-value">右侧 ▾</span>
+          </div>
+          <div class="settings-row">
+            <span class="settings-label">显示换位按钮</span>
+            <div class="switch"></div>
+          </div>
+        </div>
+        <div class="settings-section">
+          <div style="font-size:14px;font-weight:600;color:var(--accent);margin-bottom:8px;">执行设置</div>
+          <div class="settings-row">
+            <span class="settings-label">默认屏幕常亮</span>
+            <div class="switch off"></div>
+          </div>
+          <div class="settings-row">
+            <span class="settings-label">执行失败处理</span>
+            <span class="settings-value">中止任务 ▾</span>
+          </div>
+          <div class="settings-row">
+            <span class="settings-label">失败重试次数</span>
+            <span class="settings-value">0</span>
+          </div>
+          <div class="settings-row">
+            <span class="settings-label">通知提醒</span>
+            <div class="switch"></div>
+          </div>
+        </div>
+        <div class="settings-section">
+          <div style="font-size:14px;font-weight:600;color:var(--accent);margin-bottom:8px;">步骤间停顿</div>
+          <div class="settings-row">
+            <span class="settings-label">启用步骤间停顿</span>
+            <div class="switch off"></div>
+          </div>
+          <div class="settings-row">
+            <span class="settings-label">最小停顿时间（秒）</span>
+            <span class="settings-value">0.5</span>
+          </div>
+          <div class="settings-row">
+            <span class="settings-label">最大停顿时间（秒）</span>
+            <span class="settings-value">2.0</span>
+          </div>
+        </div>
+        <div class="settings-section">
+          <div style="font-size:14px;font-weight:600;color:var(--accent);margin-bottom:8px;">日志管理</div>
+          <div class="settings-row">
+            <span class="settings-label">启用自动清理</span>
+            <div class="switch off"></div>
+          </div>
+          <div class="settings-row">
+            <span class="settings-label">保留日志条数（1-9999）</span>
+            <span class="settings-value">500</span>
+          </div>
+        </div>
+        <div class="settings-section">
+          <div style="font-size:14px;font-weight:600;color:var(--accent);margin-bottom:8px;">关于</div>
+          <div style="background:var(--rule);padding:12px;border-radius:8px;">
+            <div style="font-size:16px;font-weight:600;">step_recorder</div>
+            <div style="font-size:12px;color:var(--muted);">版本：0.1.0 (MVP)</div>
+            <div style="font-size:12px;color:var(--muted);">技术栈：Python + Flet 0.86</div>
+            <div style="font-size:12px;color:var(--muted);">目标平台：Android only</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ========== 抽屉模式（添加任务） ========== -->
+  <div class="screen-wrap">
+    <div class="screen-label">抽屉模式 · 新建任务（半透明遮罩）</div>
+    <div class="phone">
+      <div class="appbar">
+        <div class="icon-btn">⚙</div>
+        <div class="title">任务管理</div>
+        <button class="add-btn">+ 添加任务</button>
+      </div>
+      <div class="safe-area" style="position:relative;">
+        <div style="padding:8px 16px;">
+          <div style="font-size:14px;font-weight:600;">全部任务</div>
+          <div style="font-size:12px;color:var(--muted);">共 5 项</div>
+        </div>
+        <!-- 半透明遮罩 + 抽屉 -->
+        <div class="drawer-overlay">
+          <div class="drawer">
+            <div class="drawer-title">
+              <span class="icon">＋</span>
+              <span class="text">新建任务</span>
+            </div>
+            <div class="form-field">
+              <label class="form-label">任务名称</label>
+              <input class="form-input" placeholder="请输入任务名称" />
+            </div>
+            <div class="form-field">
+              <label class="form-label">任务描述</label>
+              <textarea class="form-input" rows="2" placeholder="任务描述"></textarea>
+            </div>
+            <div class="form-field">
+              <label class="form-label">任务分类</label>
+              <div class="dropdown-mock">默认 ▾</div>
+            </div>
+            <div class="form-field">
+              <label class="form-label">父任务（可选）</label>
+              <div class="dropdown-mock">无（顶层任务） ▾</div>
+            </div>
+            <div class="form-field">
+              <label class="form-label">任务图标</label>
+              <div class="icon-grid">
+                <div class="icon-cell selected">▶</div>
+                <div class="icon-cell">☑</div>
+                <div class="icon-cell">📋</div>
+                <div class="icon-cell">💼</div>
+                <div class="icon-cell">🎓</div>
+                <div class="icon-cell">☀</div>
+                <div class="icon-cell">💧</div>
+                <div class="icon-cell">⏻</div>
+                <div class="icon-cell">⚙</div>
+                <div class="icon-cell">🎮</div>
+              </div>
+            </div>
+            <div class="settings-row">
+              <span class="settings-label">启用此任务</span>
+              <div class="switch"></div>
+            </div>
+            <div class="settings-row">
+              <span class="settings-label">执行时保持屏幕常亮</span>
+              <div class="switch off"></div>
+            </div>
+            <div class="btn-row">
+              <button class="btn btn-ghost">取消</button>
+              <button class="btn btn-primary">保存</button>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="nav-bar">
+        <div class="nav-item active"><div class="icon">☑</div>任务</div>
+        <div class="nav-item"><div class="icon">📊</div>统计</div>
+        <div class="nav-item"><div class="icon">📋</div>日志</div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<h2 id="components">组件库</h2>
+<div class="screens-grid">
+  <!-- AlertDialog 二次确认 -->
+  <div class="screen-wrap">
+    <div class="screen-label">AlertDialog · 删除二次确认</div>
+    <div class="phone">
+      <div class="appbar"><div class="title">任务管理</div></div>
+      <div class="safe-area" style="position:relative;">
+        <div style="padding:16px;font-size:12px;color:var(--muted);">点击删除按钮后弹出确认对话框：</div>
+        <div class="dialog-overlay">
+          <div class="dialog">
+            <h3>确认删除</h3>
+            <p>确定要删除任务「早晨例行程序」吗？此操作不可撤销。</p>
+            <div class="dialog-actions">
+              <button class="btn btn-ghost">取消</button>
+              <button class="btn btn-danger">确认删除</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 空状态 -->
+  <div class="screen-wrap">
+    <div class="screen-label">EmptyState · 空状态</div>
+    <div class="phone">
+      <div class="appbar"><div class="icon-btn">←</div><div class="title">执行日志</div></div>
+      <div class="safe-area">
+        <div class="empty-state">
+          <div class="icon">📥</div>
+          <div class="title">暂无日志</div>
+          <div class="desc">执行任务后，日志会出现在这里</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 状态色板 -->
+  <div class="screen-wrap">
+    <div class="screen-label">状态色板 · TaskStatus</div>
+    <div class="phone">
+      <div class="appbar"><div class="title">状态色板</div></div>
+      <div class="safe-area">
+        <div class="section-title"><span class="title">任务状态</span></div>
+        <div class="card-list">
+          <div class="task-card">
+            <div class="main-row">
+              <div class="icon-block">▶</div>
+              <div class="info-col">
+                <div class="name-row">
+                  <span class="task-name">空闲</span>
+                  <span class="status-dot" style="background:var(--muted);"></span>
+                  <span class="status-text" style="color:var(--muted);">空闲</span>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="task-card">
+            <div class="main-row">
+              <div class="icon-block">▶</div>
+              <div class="info-col">
+                <div class="name-row">
+                  <span class="task-name">执行中</span>
+                  <span class="status-dot" style="background:var(--accent);"></span>
+                  <span class="status-text" style="color:var(--accent);">执行中</span>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="task-card">
+            <div class="main-row">
+              <div class="icon-block">▶</div>
+              <div class="info-col">
+                <div class="name-row">
+                  <span class="task-name">已暂停</span>
+                  <span class="status-dot" style="background:var(--warning);"></span>
+                  <span class="status-text" style="color:var(--warning);">已暂停</span>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="task-card">
+            <div class="main-row">
+              <div class="icon-block">▶</div>
+              <div class="info-col">
+                <div class="name-row">
+                  <span class="task-name">出错</span>
+                  <span class="status-dot" style="background:var(--danger);"></span>
+                  <span class="status-text" style="color:var(--danger);">出错</span>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="task-card">
+            <div class="main-row">
+              <div class="icon-block">▶</div>
+              <div class="info-col">
+                <div class="name-row">
+                  <span class="task-name disabled">已禁用</span>
+                  <span class="status-dot" style="background:var(--disabled);"></span>
+                  <span class="status-text" style="color:var(--disabled);">已禁用</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="section-title"><span class="title">日志状态徽章</span></div>
+        <div class="card-list">
+          <div style="display:flex;gap:8px;flex-wrap:wrap;">
+            <span class="badge">成功</span>
+            <span class="badge danger">失败</span>
+            <span class="badge muted">已中止</span>
+            <span class="badge" style="background:var(--accent);">执行中</span>
+            <span class="badge warning">已跳过</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<h2 id="states">状态变体</h2>
+<div class="screens-grid">
+  <!-- 任务树缩进示意 -->
+  <div class="screen-wrap">
+    <div class="screen-label">任务树缩进 · 多级子任务</div>
+    <div class="phone">
+      <div class="appbar"><div class="icon-btn">⚙</div><div class="title">任务管理</div><button class="add-btn">+ 添加</button></div>
+      <div class="safe-area">
+        <div class="section-title"><span class="title">全部任务</span><span class="count">共 3 项</span></div>
+        <div class="card-list">
+          <div class="task-card">
+            <div class="main-row">
+              <div class="icon-block">🌅</div>
+              <div class="info-col">
+                <div class="name-row"><span class="task-name">早晨例行程序</span><span class="status-dot" style="background:var(--muted);"></span><span class="status-text" style="color:var(--muted);">空闲</span></div>
+              </div>
+              <div class="actions-row"><div class="icon-action accent">▶</div><div class="switch"></div><div class="icon-action muted">▼</div></div>
+            </div>
+            <div class="footer-row"><button class="delete-btn">🗑 删除</button></div>
+          </div>
+
+          <div class="indent-1">
+            <div class="task-card">
+              <div class="main-row">
+                <div class="icon-block">⏻</div>
+                <div class="info-col">
+                  <div class="name-row"><span class="task-name">开机检查</span><span class="status-dot" style="background:var(--muted);"></span><span class="status-text" style="color:var(--muted);">空闲</span></div>
+                </div>
+                <div class="actions-row"><div class="icon-action accent">▶</div><div class="switch"></div><div class="icon-action muted">▼</div></div>
+              </div>
+              <div class="footer-row"><button class="delete-btn">🗑 删除</button></div>
+            </div>
+          </div>
+
+          <div class="indent-1" style="padding-left:48px;padding-right:48px;">
+            <div class="task-card">
+              <div class="main-row">
+                <div class="icon-block">💧</div>
+                <div class="info-col">
+                  <div class="name-row"><span class="task-name">喝水提醒</span><span class="status-dot" style="background:var(--muted);"></span><span class="status-text" style="color:var(--muted);">空闲</span></div>
+                </div>
+                <div class="actions-row"><div class="icon-action accent">▶</div><div class="switch"></div></div>
+              </div>
+              <div class="footer-row"><button class="delete-btn">🗑 删除</button></div>
+            </div>
+          </div>
+
+          <div class="indent-1">
+            <div class="task-card">
+              <div class="main-row">
+                <div class="icon-block">📖</div>
+                <div class="info-col">
+                  <div class="name-row"><span class="task-name">收集工作内容</span><span class="status-dot" style="background:var(--muted);"></span><span class="status-text" style="color:var(--muted);">空闲</span></div>
+                </div>
+                <div class="actions-row"><div class="icon-action accent">▶</div><div class="switch"></div></div>
+              </div>
+              <div class="footer-row"><button class="delete-btn">🗑 删除</button></div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="nav-bar">
+        <div class="nav-item active"><div class="icon">☑</div>任务</div>
+        <div class="nav-item"><div class="icon">📊</div>统计</div>
+        <div class="nav-item"><div class="icon">📋</div>日志</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+</body>
+</html>
