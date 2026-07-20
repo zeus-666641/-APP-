@@ -8,6 +8,7 @@
 - 换位按钮显隐 → Q28
 - 执行设置（默认屏幕常亮/失败处理/重试次数/通知）→ PRD 11.2
 - 步骤间停顿（可随机+可设置随机范围）→ 需求16/F7
+- 日志管理（自动清理开关 + 保留条数 1-9999，Q48）
 - 关于（版本/作者）→ PRD 11.3
 """
 import flet as ft
@@ -167,6 +168,22 @@ class SettingsView(ft.View):
                                 helper_text="最小=最大时为固定停顿",
                             ),
 
+                            # === 日志管理（Q48 决策）===
+                            self._section_title("日志管理"),
+                            ft.Switch(
+                                label="启用自动清理",
+                                value=bool(get_app_setting("log_auto_cleanup_enabled", False)),
+                                on_change=self._handle_log_cleanup_enabled_change,
+                                helper_text="开启后自动保留最近的 N 条日志，其余删除",
+                            ),
+                            ft.TextField(
+                                label="保留日志条数（1-9999）",
+                                value=str(get_app_setting("log_keep_count", 500)),
+                                keyboard_type=ft.KeyboardType.NUMBER,
+                                on_change=self._handle_log_keep_count_change,
+                                helper_text="范围 1-9999，默认 500",
+                            ),
+
                             # === 关于（PRD 11.3）===
                             self._section_title("关于"),
                             ft.Container(
@@ -290,6 +307,26 @@ class SettingsView(ft.View):
         min_v = float(get_app_setting("inter_step_pause_min", 0.5))
         if value < min_v:
             set_app_setting("inter_step_pause_min", value)
+
+    # ---- 日志管理（Q48）----
+
+    def _handle_log_cleanup_enabled_change(self, e: ft.ControlEvent) -> None:
+        """启用自动清理开关"""
+        set_app_setting("log_auto_cleanup_enabled", bool(e.control.value))
+
+    def _handle_log_keep_count_change(self, e: ft.ControlEvent) -> None:
+        """保留日志条数变更（1-9999）"""
+        raw = str(e.control.value or "").strip()
+        try:
+            n = int(raw)
+        except ValueError:
+            n = 500
+        # 范围约束：1-9999
+        if n < 1:
+            n = 1
+        elif n > 9999:
+            n = 9999
+        set_app_setting("log_keep_count", n)
 
     def _handle_back(self, e: ft.ControlEvent | None = None) -> None:
         """返回上一页"""
