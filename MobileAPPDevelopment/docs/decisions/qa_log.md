@@ -219,3 +219,33 @@
 - **影响**：step_editor_view 内置 `_default_mock_steps()` 返回 list[StepCardData]，覆盖 OPEN_URL/DELAY/DARK_MODE/BLUETOOTH(VISIBLE_NOT_IMPL)/CLICK 等代表性类型
 
 ---
+
+## 2026-07-20 续3（M2-T2.8 draggable_list 设计）
+
+### Q24. 拖拽实现方式
+- **问题**：T2.8 draggable_list 的拖拽实现选哪个？
+- **选项**：
+  1. 仅 ↑/↓ 按钮（无拖拽，最稳，但与 PRD「拖拽」语义有偏差）
+  2. 仅 Draggable+DragTarget 真拖拽（无按钮，符合 PRD，但触屏体验不一定好）
+  3. 拖拽 + ↑/↓ 按钮双保险（按钮可通过设置开关显示/隐藏）
+  4. LongPressDraggable（长按拖动，更接近原生 ReorderableListView）
+- **用户选择**：选 3 拖拽 + ↑/↓ 按钮，按钮开关可设置
+- **影响**：DraggableList 组件同时实现 Draggable+DragTarget 与 ↑/↓ 按钮；构造参数 `show_reorder_buttons: bool = True`；未来在设置中切换
+
+### Q25. 子任务嵌套拖拽
+- **问题**：T2.8 是否含子任务嵌套拖拽？（RUN_SUBTASK 类型可能展开子步骤）
+- **选项**：
+  1. 支持嵌套（子步骤可拖入父步骤，可视化层级）
+  2. 仅同级排序，不主动提示嵌套（但内部保留嵌套能力）
+  3. 完全禁止嵌套（删除子任务概念）
+- **用户选择**：选 2 仅同级排序，不主动提示嵌套
+- **影响**：DraggableList 的 `on_reorder(old_index, new_index)` 仅处理同级；不暴露嵌套 UI；数据层为未来嵌套留接口（step.parent_id 字段保留但不渲染）
+
+### Q26-Q29. 拖拽视觉/交互细节（用户跳过提问，按推荐默认推进）
+- **Q26 拖拽触发区**：选「专属拖拽手柄（左侧 ≡ 图标）」—— 避免误触点击编辑，最稳定
+- **Q27 拖动时原位置反馈**：选「半透明灰色占位」—— `content_when_dragging` 用 opacity=0.3 的同形占位
+- **Q28 ↑/↓ 按钮开关**：选「默认显示按钮」—— 首跑即可见；未来在 settings 中可关闭；本次实现不接入设置，构造参数 `show_reorder_buttons: bool = True`
+- **Q29 拖到边界**：选「禁用按钮（变灰）」—— 第一项 ↑ 禁用，最后一项 ↓ 禁用；拖拽到边界自动停止
+- **影响**：DraggableList 每行结构 = `DragTarget(content=Row[≡ handle, content_view, ↑↓ buttons])`；max_simultaneous_drags=1；on_accept 时通过 e.src.data 与 self.data 取得 old/new_index
+
+---
