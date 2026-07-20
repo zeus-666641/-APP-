@@ -14,7 +14,7 @@ class SettingsView(ft.View):
             controls=[
                 ft.AppBar(
                     title=ft.Text("设置"),
-                    bgcolor=ft.colors.SURFACE_VARIANT,
+                    bgcolor=ft.Colors.SURFACE_CONTAINER_HIGH,
                 ),
                 ft.SafeArea(
                     ft.Column(
