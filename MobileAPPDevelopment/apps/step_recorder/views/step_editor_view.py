@@ -1,10 +1,11 @@
-"""步骤编辑器主视图（M2-T2.7 首次可运行）
+"""步骤编辑器主视图（M2-T2.7 首次可运行 + T2.8 拖拽列表）
 
-按 Q21-Q23 决策落地：
+按 Q21-Q29 决策落地：
 - Q21 抽屉式侧滑：右侧滑出宽度 80%，含 StepTypePicker + ParamEditor
 - Q22 双入口：FAB（默认）+ 顶部 AppBar 按钮，二者调用同一 add 流程
 - Q23 mock 3-5 条示例步骤：覆盖 AVAILABLE/LIMITED/NOT_IMPLEMENTED 三种状态
 - Q20 未保存离开：编辑抽屉关闭前检查 dirty，弹 AlertDialog 三选一
+- Q24-Q29 DraggableList：拖拽手柄 + 换位按钮（输入目标行号），可独立开关
 
 入口：page.go("/step_editor")
 """
@@ -15,6 +16,7 @@ from typing import Any
 import flet as ft
 
 from models.step import StepStatus, StepType, get_step_type_meta
+from views.components.draggable_list import DraggableList
 from views.components.notifier import Notifier
 from views.components.param_editor import ParamEditor
 from views.components.step_card import StepCard, StepCardData
@@ -282,12 +284,17 @@ class StepEditorView(ft.View):
         self._steps: list[StepCardData] = _default_mock_steps()
         self._drawer_visible = False
 
-        # 步骤列表 ListView
-        self._steps_list = ft.ListView(
-            controls=self._render_step_cards(),
+        # 步骤列表（Q24-Q29：DraggableList 替换原 ListView）
+        self._steps_list = DraggableList(
+            items=self._steps,
+            item_builder=self._build_step_card,
+            on_reorder=self._handle_reorder,
+            key_extractor=lambda s: s.step_id,
+            page=page,
+            show_drag_handle=True,    # Q28：默认显示
+            show_swap_button=True,    # Q28：默认显示
+            drag_handle_side="right", # Q26：默认右侧
             spacing=8,
-            padding=ft.Padding(left=12, right=12, top=12, bottom=80),
-            expand=True,
         )
 
         # 编辑抽屉（Q21 决策）
@@ -373,25 +380,53 @@ class StepEditorView(ft.View):
 
     # ---- 渲染 ----
 
+    def _build_step_card(self, data: StepCardData, index: int) -> StepCard:
+        """为 DraggableList 构建单个 StepCard（item_builder）"""
+        # 同步 step_order（拖拽后顺序变化）
+        if data.step_order != index + 1:
+            data.step_order = index + 1
+        return StepCard(
+            data=data,
+            on_toggle_enabled=self._handle_toggle_step,
+            on_delete=self._handle_delete_step,
+            on_click=self._handle_edit_step,
+        )
+
     def _render_step_cards(self) -> list[StepCard]:
-        """重新渲染所有步骤卡片"""
+        """批量渲染所有步骤卡片（保留兼容）"""
         return [
-            StepCard(
-                data=step,
-                on_toggle_enabled=self._handle_toggle_step,
-                on_delete=self._handle_delete_step,
-                on_click=self._handle_edit_step,
-            )
-            for step in self._steps
+            self._build_step_card(step, i)
+            for i, step in enumerate(self._steps)
         ]
 
     def _refresh_step_list(self) -> None:
         """刷新步骤列表控件"""
-        self._steps_list.controls = self._render_step_cards()
+        self._steps_list.set_items(self._steps)
         try:
             self._page.update()
         except Exception:
             pass
+
+    # ---- 拖拽 / 换位回调（Q24-Q29）----
+
+    def _handle_reorder(self, old_index: int, new_index: int) -> None:
+        """拖拽或换位后重排序（Q24-Q29）"""
+        # 同步 self._steps 的顺序与 DraggableList 内部一致
+        if old_index == new_index:
+            return
+        if not (0 <= old_index < len(self._steps)):
+            return
+        if not (0 <= new_index < len(self._steps)):
+            return
+        item = self._steps.pop(old_index)
+        insert_at = min(new_index, len(self._steps))
+        self._steps.insert(insert_at, item)
+        # 重新编号 step_order
+        for i, s in enumerate(self._steps, 1):
+            s.step_order = i
+        # 刷新 DraggableList（重新渲染以反映新序号）
+        self._steps_list.set_items(self._steps)
+        self._notifier.step_moved(f"从第 {old_index + 1} 行移到第 {new_index + 1} 行")
 
     # ---- 事件处理 ----
 

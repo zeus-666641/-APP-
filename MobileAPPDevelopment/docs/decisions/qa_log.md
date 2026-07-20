@@ -241,11 +241,31 @@
 - **用户选择**：选 2 仅同级排序，不主动提示嵌套
 - **影响**：DraggableList 的 `on_reorder(old_index, new_index)` 仅处理同级；不暴露嵌套 UI；数据层为未来嵌套留接口（step.parent_id 字段保留但不渲染）
 
-### Q26-Q29. 拖拽视觉/交互细节（用户跳过提问，按推荐默认推进）
-- **Q26 拖拽触发区**：选「专属拖拽手柄（左侧 ≡ 图标）」—— 避免误触点击编辑，最稳定
-- **Q27 拖动时原位置反馈**：选「半透明灰色占位」—— `content_when_dragging` 用 opacity=0.3 的同形占位
-- **Q28 ↑/↓ 按钮开关**：选「默认显示按钮」—— 首跑即可见；未来在 settings 中可关闭；本次实现不接入设置，构造参数 `show_reorder_buttons: bool = True`
-- **Q29 拖到边界**：选「禁用按钮（变灰）」—— 第一项 ↑ 禁用，最后一项 ↓ 禁用；拖拽到边界自动停止
-- **影响**：DraggableList 每行结构 = `DragTarget(content=Row[≡ handle, content_view, ↑↓ buttons])`；max_simultaneous_drags=1；on_accept 时通过 e.src.data 与 self.data 取得 old/new_index
+### Q26-Q29. 拖拽视觉/交互细节（用户正式答复）
+- **Q26 拖拽触发区**：选「专属拖拽手柄」，但**默认在右侧**（不是左侧），并支持设置切换左/右
+  - 影响：构造参数 `drag_handle_side: Literal["left", "right"] = "right"`，未来在 settings 中可切换
+- **Q27 拖动时原位置反馈**：选「半透明灰色占位」
+  - 影响：`content_when_dragging` 用 opacity=0.3 + bgcolor="#f1f5f9" 的同形占位
+- **Q28 ↑/↓ 按钮的开关默认值与位置**：用户提出全新设计
+  - "上下箭头集成了一个按钮"：合并为单个"换位"按钮（图标 `SWAP_VERT`）
+  - "点击按钮的时候显示输入框"：点击后弹 AlertDialog 含 TextField
+  - "输入要调换的行数"：用户输入目标行号（1-based）
+  - "并可一键调换"：对话框内有"一键调换"按钮
+  - "上下箭头按钮和拖拽按钮可以同时出现"：换位按钮 + 拖拽手柄 可并存
+  - "设置里面可以调整开关任意一个按钮"：两个按钮可独立开关
+  - 影响：
+    - 构造参数 `show_drag_handle: bool = True` + `show_swap_button: bool = True`（两者独立）
+    - 点击换位按钮 → 弹 AlertDialog(TextField + 一键调换按钮)
+    - 输入目标行号 → 移动到该位置（移动语义，非交换）
+- **Q29 拖到边界（输入行号超范围）**：
+  - "先按上一问的回答来做"：先用 Q28 的换位对话框处理
+  - "当输入行数超出范围，例如超出最后一行就提示是否移动到最后一行"：target > total → 二级确认"是否移动到最后一行？"
+  - "小于一行就提示是否移动到第 1 行"：target < 1 → 二级确认"是否移动到第 1 行？"
+  - 影响：`_show_boundary_confirm(current_index, boundary_index, reason, label)` 弹二级 AlertDialog
+- **综合影响**：
+  - DraggableList 每行结构 = `DragTarget(content=Container(Row[handle?, Draggable(content=item), handle?, swap_btn?]))`
+  - `max_simultaneous_drags=1`（避免多指拖拽混乱）
+  - `on_accept` 通过 `e.src.data`（key）反查 src_index，调用 `_reorder(old, new)`
+  - 换位按钮点击 → `_handle_swap_click(current_index)` → 弹输入对话框 → 校验 → 移动 or 二级确认
 
 ---
