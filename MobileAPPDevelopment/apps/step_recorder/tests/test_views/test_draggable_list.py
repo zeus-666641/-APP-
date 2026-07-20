@@ -98,15 +98,23 @@ class TestRendering:
         assert len(draggables) == 1
 
     def test_draggable_has_content_when_dragging(self):
-        """Q27：Draggable 设置 content_when_dragging 半透明占位"""
+        """Q27：Draggable 设置 content_when_dragging 半透明占位
+
+        B2 修复后：手柄是独立的 Draggable，content_when_dragging 是
+        一个 disabled 的 IconButton（手柄占位，颜色更浅），而不是 Container。
+        """
         dl = DraggableList(items=_make_items(1), item_builder=_text_builder)
         target = dl.controls[0]
         row = target.content.content
         draggable = next(c for c in row.controls if isinstance(c, ft.Draggable))
         assert draggable.content_when_dragging is not None
-        # 占位是 Container
-        assert isinstance(draggable.content_when_dragging, ft.Container)
-        assert draggable.content_when_dragging.opacity == 0.3
+        # B2：占位是 IconButton（手柄占位，颜色更浅）
+        assert isinstance(draggable.content_when_dragging, ft.IconButton)
+        assert draggable.content_when_dragging.disabled is True
+        # 占位颜色比正常手柄浅（_HANDLE_COLOR_DRAGGING vs _HANDLE_COLOR）
+        from views.components.draggable_list import _HANDLE_COLOR, _HANDLE_COLOR_DRAGGING
+        assert draggable.content_when_dragging.icon_color == _HANDLE_COLOR_DRAGGING
+        assert draggable.content.icon_color == _HANDLE_COLOR
 
     def test_draggable_group_matches_target_group(self):
         """Draggable 与 DragTarget 同 group 才能接受"""
@@ -125,43 +133,67 @@ class TestRendering:
         assert draggable.max_simultaneous_drags == 1
 
     def test_handle_present_on_right_by_default(self):
-        """Q26：默认右侧有 handle"""
+        """Q26：默认右侧有 handle
+
+        B2 修复后结构：[content, Draggable(handle), swap_btn]
+        其中 Draggable.content 是 IconButton(icon=DRAG_HANDLE)。
+        """
         dl = DraggableList(items=_make_items(1), item_builder=_text_builder)
         row = dl.controls[0].content.content
-        # 顺序：Draggable, handle, swap_btn
+        # 顺序：content(Text), Draggable(handle), swap_btn
         types = [type(c) for c in row.controls]
-        assert types[0] == ft.Draggable
-        # handle 是 IconButton
-        assert any(isinstance(c, ft.IconButton) and c.icon == ft.Icons.DRAG_HANDLE for c in row.controls)
+        # 第一项是 content（_text_builder 返回 Text）
+        assert types[0] == ft.Text
+        # 第二项是 Draggable（手柄）
+        assert types[1] == ft.Draggable
+        # Draggable.content 是 IconButton(DRAG_HANDLE)
+        handle_draggable = row.controls[1]
+        assert isinstance(handle_draggable.content, ft.IconButton)
+        assert handle_draggable.content.icon == ft.Icons.DRAG_HANDLE
         # 最后应该是 swap_btn
         assert isinstance(row.controls[-1], ft.IconButton)
         assert row.controls[-1].icon == ft.Icons.SWAP_VERT
 
     def test_handle_on_left_when_configured(self):
-        """Q26：可切换到左侧"""
+        """Q26：可切换到左侧
+
+        B2 修复后结构：[Draggable(handle), content, swap_btn]
+        其中 Draggable.content 是 IconButton(icon=DRAG_HANDLE)。
+        """
         dl = DraggableList(
             items=_make_items(1),
             item_builder=_text_builder,
             drag_handle_side="left",
         )
         row = dl.controls[0].content.content
-        # 顺序：handle, Draggable, swap_btn
-        assert isinstance(row.controls[0], ft.IconButton)
-        assert row.controls[0].icon == ft.Icons.DRAG_HANDLE
-        assert isinstance(row.controls[1], ft.Draggable)
+        # 顺序：Draggable(handle), content(Text), swap_btn
+        assert isinstance(row.controls[0], ft.Draggable)
+        # Draggable.content 是 IconButton(DRAG_HANDLE)
+        assert isinstance(row.controls[0].content, ft.IconButton)
+        assert row.controls[0].content.icon == ft.Icons.DRAG_HANDLE
+        # 第二项是 content（_text_builder 返回 Text）
+        assert isinstance(row.controls[1], ft.Text)
+        # 最后是 swap_btn
+        assert isinstance(row.controls[-1], ft.IconButton)
+        assert row.controls[-1].icon == ft.Icons.SWAP_VERT
 
     def test_no_handle_when_disabled(self):
+        """B2 修复后：禁用手柄时，行内无 Draggable（只剩 content + swap_btn）"""
         dl = DraggableList(
             items=_make_items(1),
             item_builder=_text_builder,
             show_drag_handle=False,
         )
         row = dl.controls[0].content.content
-        # 只有 Draggable 和 swap_btn
+        # 没有 Draggable
+        draggables = [c for c in row.controls if isinstance(c, ft.Draggable)]
+        assert len(draggables) == 0
+        # 没有 DRAG_HANDLE IconButton
         handles = [c for c in row.controls if isinstance(c, ft.IconButton) and c.icon == ft.Icons.DRAG_HANDLE]
         assert len(handles) == 0
-        # Draggable 还在
-        assert any(isinstance(c, ft.Draggable) for c in row.controls)
+        # content 和 swap_btn 还在
+        assert any(isinstance(c, ft.Text) for c in row.controls)
+        assert any(isinstance(c, ft.IconButton) and c.icon == ft.Icons.SWAP_VERT for c in row.controls)
 
     def test_no_swap_btn_when_disabled(self):
         dl = DraggableList(
@@ -173,7 +205,8 @@ class TestRendering:
         swaps = [c for c in row.controls if isinstance(c, ft.IconButton) and c.icon == ft.Icons.SWAP_VERT]
         assert len(swaps) == 0
 
-    def test_both_disabled_leaves_only_draggable(self):
+    def test_both_disabled_leaves_only_content(self):
+        """B2 修复后：禁用所有手柄和换位按钮时，只剩 content（无 Draggable）"""
         dl = DraggableList(
             items=_make_items(1),
             item_builder=_text_builder,
@@ -181,9 +214,11 @@ class TestRendering:
             show_swap_button=False,
         )
         row = dl.controls[0].content.content
-        # 只剩 Draggable
+        # 只剩 content（_text_builder 返回 Text）
         assert len(row.controls) == 1
-        assert isinstance(row.controls[0], ft.Draggable)
+        assert isinstance(row.controls[0], ft.Text)
+        # 没有 Draggable
+        assert not any(isinstance(c, ft.Draggable) for c in row.controls)
 
 
 # ---- _find_index_by_key 测试 ----
@@ -487,6 +522,7 @@ class TestDynamicToggle:
         assert len(swaps) == 0
 
     def test_set_drag_handle_side_left(self):
+        """B2 修复后：手柄在左侧时，row.controls[0] 是 Draggable(内含 IconButton(DRAG_HANDLE))"""
         dl = DraggableList(
             items=_make_items(1),
             item_builder=_text_builder,
@@ -495,9 +531,10 @@ class TestDynamicToggle:
         dl.set_drag_handle_side("left")
         assert dl._drag_handle_side == "left"
         row = dl.controls[0].content.content
-        # handle 应在第一位
-        assert isinstance(row.controls[0], ft.IconButton)
-        assert row.controls[0].icon == ft.Icons.DRAG_HANDLE
+        # handle 应在第一位（Draggable 内含 IconButton(DRAG_HANDLE)）
+        assert isinstance(row.controls[0], ft.Draggable)
+        assert isinstance(row.controls[0].content, ft.IconButton)
+        assert row.controls[0].content.icon == ft.Icons.DRAG_HANDLE
 
 
 # ---- _handle_swap_click 测试（page=None 时早退）----

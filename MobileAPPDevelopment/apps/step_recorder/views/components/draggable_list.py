@@ -4,12 +4,17 @@
 - Q24：拖拽 + 换位按钮双保险（按钮可独立开关）
 - Q25：仅同级排序，不主动提示嵌套
 - Q26：拖拽手柄在右侧（默认），可配置左/右
-- Q27：拖动时原位置半透明灰色占位
+- Q27：拖动时手柄半透明灰色占位
 - Q28：合并 ↑/↓ 为单个"换位"按钮 → 弹输入框 → 输入目标行号 → 一键移动
 - Q29：输入超范围 → 二级确认对话框（移动到第 1 行 / 最后一行）
 
-设计要点：
-- 每行结构：DragTarget(Container(Row[handle?, Draggable(content), handle?, swap_btn?]))
+设计要点（B2 修复后版本）：
+- **关键修复**：Draggable 仅包裹"拖拽手柄"，不再包裹整个 content
+  原因：Flet 不允许同一控件对象被两个父控件同时引用（原版 content 被
+  Draggable.content 与 placeholder.content 同时引用，导致 Switch、
+  IconButton 等子控件的事件被吞，开关/删除/换位按钮全部无响应）。
+- 每行结构：DragTarget(Container(Row[handle?, content, handle?, swap_btn?]))
+- 手柄结构：Draggable(IconButton(...))
 - max_simultaneous_drags=1 避免多指混乱
 - on_accept 通过 e.src.data（key）反查 src_index
 - 移动语义（非交换）：从 old_index 取出，插入到 new_index，其他项顺延
@@ -25,11 +30,12 @@ import flet as ft
 
 _DEFAULT_GROUP_PREFIX = "draggable_list"
 _DEFAULT_SPACING = 8
-_PLACEHOLDER_OPACITY = 0.3
+_PLACEHOLDER_OPACITY = 0.4
 _PLACEHOLDER_BGCOLOR = "#f1f5f9"
 
 _HANDLE_ICON = ft.Icons.DRAG_HANDLE
 _HANDLE_COLOR = "#94a3b8"
+_HANDLE_COLOR_DRAGGING = "#cbd5e1"  # 拖拽中手柄半透明灰
 _SWAP_ICON = ft.Icons.SWAP_VERT
 _SWAP_COLOR = "#6b7280"
 
@@ -70,6 +76,8 @@ class DraggableList(ft.Column):
         self._page = page
         # 每个 DraggableList 实例独立 group，避免多个列表互相接受拖拽
         self._group = f"{_DEFAULT_GROUP_PREFIX}_{id(self)}"
+        # 拖拽中状态：记录当前正在拖拽的 index，用于高亮
+        self._dragging_index: int | None = None
 
         super().__init__(
             controls=self._render_items(),
@@ -88,30 +96,38 @@ class DraggableList(ft.Column):
     def _build_item(self, item: Any, index: int) -> ft.DragTarget:
         """构建单个可拖拽项
 
-        结构：
+        结构（B2 修复后）：
             DragTarget(
                 content=Container(
-                    content=Row[handle?, Draggable(content, placeholder), handle?, swap_btn?]
+                    content=Row[handle?, content, handle?, swap_btn?]
                 ),
                 on_accept=...
             )
+
+        手柄是独立的 Draggable（不再包裹整个 content）。
         """
         key = self._key_extractor(item)
         content = self._item_builder(item, index)
 
-        # 拖拽中的半透明占位（Q27）
-        placeholder = ft.Container(
-            content=content,
-            opacity=_PLACEHOLDER_OPACITY,
-            bgcolor=_PLACEHOLDER_BGCOLOR,
-        )
-
-        # 拖拽手柄（Q26）
-        drag_handle = ft.IconButton(
+        # 拖拽手柄（Q26）：独立 Draggable，content_when_dragging 是手柄自己的占位
+        handle_placeholder = ft.IconButton(
             icon=_HANDLE_ICON,
             icon_size=18,
-            icon_color=_HANDLE_COLOR,
-            tooltip="拖动排序",
+            icon_color=_HANDLE_COLOR_DRAGGING,
+            tooltip="拖动中",
+            disabled=True,
+        )
+        drag_handle = ft.Draggable(
+            content=ft.IconButton(
+                icon=_HANDLE_ICON,
+                icon_size=18,
+                icon_color=_HANDLE_COLOR,
+                tooltip="拖动排序",
+            ),
+            group=self._group,
+            content_when_dragging=handle_placeholder,
+            data=key,
+            max_simultaneous_drags=1,
         )
 
         # 换位按钮（Q28）
@@ -123,26 +139,17 @@ class DraggableList(ft.Column):
             on_click=lambda e, idx=index: self._handle_swap_click(idx),
         )
 
-        # 包装内容为 Draggable（Q27：原位置半透明占位）
-        draggable = ft.Draggable(
-            content=content,
-            group=self._group,
-            content_when_dragging=placeholder,
-            data=key,
-            max_simultaneous_drags=1,
-        )
-
-        # 组装 Row
+        # 组装 Row：content 不被 Draggable 包裹，事件可正常触发
         row_children: list[ft.Control] = []
         if self._show_drag_handle and self._drag_handle_side == "left":
             row_children.append(drag_handle)
-        row_children.append(draggable)
+        row_children.append(content)
         if self._show_drag_handle and self._drag_handle_side == "right":
             row_children.append(drag_handle)
         if self._show_swap_button:
             row_children.append(swap_btn)
 
-        # DragTarget 包裹（接受同 group 拖拽）
+        # DragTarget 包裹整行（接受拖拽放置）
         return ft.DragTarget(
             content=ft.Container(
                 content=ft.Row(
@@ -153,10 +160,21 @@ class DraggableList(ft.Column):
             ),
             group=self._group,
             on_accept=lambda e, target_idx=index: self._handle_drop(e, target_idx),
+            on_will_accept=lambda e, target_idx=index: self._handle_will_accept(target_idx),
+            on_leave=lambda e, target_idx=index: self._handle_leave(target_idx),
             data=index,
         )
 
     # ---- 拖拽处理 ----
+
+    def _handle_will_accept(self, target_index: int) -> None:
+        """拖拽悬停时高亮目标行（Q27 视觉反馈）"""
+        # 简单实现：不做强样式变更，避免重新渲染引起的事件丢失
+        pass
+
+    def _handle_leave(self, target_index: int) -> None:
+        """拖拽离开目标行"""
+        pass
 
     def _handle_drop(self, e: ft.DragTargetAcceptEvent, target_index: int) -> None:
         """处理拖拽放置（Q24 真拖拽）"""

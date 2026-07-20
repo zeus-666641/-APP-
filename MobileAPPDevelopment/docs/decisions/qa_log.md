@@ -269,3 +269,71 @@
   - 换位按钮点击 → `_handle_swap_click(current_index)` → 弹输入对话框 → 校验 → 移动 or 二级确认
 
 ---
+
+## 2026-07-20 续4（D1 后续 4 项小改动 F9a-d）
+
+### Q30. 添加步骤按钮样式（F9a）
+- **问题**：当前 AppBar 添加步骤按钮是 IconButton，PRD `.add-btn` 是胶囊状 accent 背景 + 白字。怎么改？
+- **选项**：
+  1. 改为 `ft.Button` + accent 背景 + 白字（与 PRD 一致）
+  2. 保持 IconButton（图标按钮）
+  3. FAB 改胶囊状
+- **用户选择**：选 1 改为 `ft.Button` + accent 背景 + 白字
+- **影响**：step_editor_view.py `_build_main_content` 中 AppBar actions 改用 `ft.Button("添加步骤", icon=ft.Icons.ADD, bgcolor="#2563eb", color="white")`
+
+### Q31. StepCard 删除按钮二次确认（F9b）
+- **问题**：当前 StepCard 删除按钮直接删除，PRD 第 4 章明确要求"删除需二次确认"。怎么实现？
+- **选项**：
+  1. modal AlertDialog（标题 + 步骤名 + 取消/确认删除两个按钮，确认按钮红色）
+  2. SnackBar 倒计时撤销
+  3. 长按删除（短按不触发）
+- **用户选择**：选 1 modal AlertDialog
+- **影响**：step_card.py `_handle_delete` 改为：先弹 `ft.AlertDialog(modal=True, content=Text("确定要删除步骤「X」吗？此操作不可撤销。"), actions=[取消, 确认删除(红色)])`，确认后才调用 `self._on_delete(step_id)`
+
+### Q32. 步骤列表上方 section-title（F9c）
+- **问题**：PRD `.section-title` 在列表上方有分组标题（左标题右统计）。怎么加？
+- **选项**：
+  1. 加 `ft.Row([Text("执行步骤", 14px W_600), Text("共 N 项", 12px 灰)], SPACE_BETWEEN)
+  2. 仅加标题 "执行步骤"
+  3. 加分类筛选 dropdown
+- **用户选择**：选 1 加 Row 标题 + 计数
+- **影响**：step_editor_view.py `_build_main_content` 在步骤列表上方加 `self._section_title`；`_refresh_step_list` 同步更新计数 `f"共 {len(self._steps)} 项"`
+
+### Q33. step-actions 图标尺寸（F9d）
+- **问题**：PRD `.step-actions` 图标 14px，当前 StepCard 操作图标 18px（delete/expand/add_child）和 22px（execute）。怎么统一？
+- **选项**：
+  1. 仅调 18→14，execute 保留 22 作为主 CTA
+  2. 全部调到 14（包括 execute），视觉一致但 execute 视觉权重降低
+  3. 全部调到 18（中等档）
+- **用户选择（初次）**：选 1 仅调 18→14
+- **用户选择（追问后改）**：改为选 2 全部 14px
+- **影响**：step_card.py 中 `delete_btn`、`expand_btn`、`add_child_btn`、`execute_btn` 的 `icon_size` 全部统一为 14
+
+### Q34. 文件超限处理（CHK10）
+- **问题**：step_card.py（565 行）和 step_editor_view.py（748 行）都超 500 行（ORG2）。pre-existing 状态，非 F9 引入。如何处理？
+- **选项**：
+  1. 延后到 M1 后统一拆分
+  2. 现在就拆
+  3. 保持现状
+- **用户选择**：选 3 保持现状
+- **影响**：记录到 项目记忆.md 的"M2.5 待重构候选"，不立即拆分
+
+### Q35. M2.5 延后设置项排期（需求4）
+- **问题**：息屏执行 / 语言切换 / 权限管理入口 何时实现？
+- **选项**：
+  1. M1 完成后
+  2. M0 完成后（M6 设置模块）
+  3. M7 执行引擎后
+- **用户选择**：选 3 M7 执行引擎后
+- **影响**：项目记忆.md 标记 M2.5 延后项归 M7 后处理；息屏执行依赖执行引擎，权限入口需要 U1+U2 落地后再开 UI
+
+### Q36. 本轮下一步
+- **问题**：F9a-d 完成后下一步？
+- **选项**：
+  1. 结束本轮→R3→下次开 M1
+  2. 继续推进 M1
+  3. 先预览验证 F9
+- **用户选择**：选 3 → R3 → 完成前面遗漏 → M1
+- **影响**：本轮做 ① 用户本机预览 F9a-d 改动 → ② R3 git commit + push → ③ 检查遗漏 → ④ 进入 M1 任务管理 UI
+
+---

@@ -20,7 +20,8 @@ def main(page: ft.Page) -> None:
     page.window.width = 400
     page.window.height = 800
 
-    # setup_routes 内部会挂载初始 HomeView（绕过 Flet 0.86 push_route 吞事件 bug）
+    # setup_routes 内部会挂载初始 StepEditorView（绕过 Flet 0.86 push_route 吞事件 bug）
+    # 需求6/F3：一进入 App 就是步骤界面，不再有 HomeView
     setup_routes(page)
 
 

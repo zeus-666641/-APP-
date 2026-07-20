@@ -217,11 +217,43 @@ class TestStepEditorView:
         assert len(appbars) >= 1
 
     def test_has_fab_button(self):
-        """右下角 FAB（Q22 决策）"""
-        page = _FakePage()
-        view = StepEditorView(page)  # type: ignore[arg-type]
-        fabs = self._find_controls_by_type(view, ft.FloatingActionButton)
-        assert len(fabs) >= 1
+        """FAB 显示由 add_step_entry 设置控制（需求3/F1）
+
+        - 默认 "appbar"：无 FAB
+        - "fab"：有 FAB
+        - "both"：有 FAB
+        """
+        from views.settings_view import _APP_SETTINGS, set_app_setting
+
+        # 备份并清理当前 add_step_entry 设置
+        original = _APP_SETTINGS.get("add_step_entry")
+        try:
+            # 1. 默认 appbar：无 FAB
+            _APP_SETTINGS.pop("add_step_entry", None)
+            page1 = _FakePage()
+            view1 = StepEditorView(page1)  # type: ignore[arg-type]
+            fabs1 = self._find_controls_by_type(view1, ft.FloatingActionButton)
+            assert len(fabs1) == 0, "默认 add_step_entry=appbar 时不应有 FAB"
+
+            # 2. fab：有 FAB
+            set_app_setting("add_step_entry", "fab")
+            page2 = _FakePage()
+            view2 = StepEditorView(page2)  # type: ignore[arg-type]
+            fabs2 = self._find_controls_by_type(view2, ft.FloatingActionButton)
+            assert len(fabs2) >= 1, "add_step_entry=fab 时应有 FAB"
+
+            # 3. both：有 FAB
+            set_app_setting("add_step_entry", "both")
+            page3 = _FakePage()
+            view3 = StepEditorView(page3)  # type: ignore[arg-type]
+            fabs3 = self._find_controls_by_type(view3, ft.FloatingActionButton)
+            assert len(fabs3) >= 1, "add_step_entry=both 时应有 FAB"
+        finally:
+            # 还原设置，避免污染其他测试
+            if original is None:
+                _APP_SETTINGS.pop("add_step_entry", None)
+            else:
+                set_app_setting("add_step_entry", original)
 
     def test_has_appbar_add_button(self):
         """AppBar 右上角 + 按钮（Q22 决策：双入口）"""
