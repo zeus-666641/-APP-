@@ -147,3 +147,43 @@
 - **用户选择**：全局搜 + 分类分段（搜索结果按分类分段展示，每段一个分类标题 + 该分类匹配项网格）
 
 ---
+
+## 2026-07-20 续（M2-T2.6 param_editor 设计）
+
+### Q17. params_schema 升级方案
+- **问题**：`params_schema: dict[str,str]` 只有字段名+类型描述，不能直接生成表单。怎么升级到结构化字段？
+- **选项**：
+  1. 新增 fields 字段（StepTypeMeta 加 `fields: list[ParamField]`，向后兼容，旧 params_schema 保留为提示文本）
+  2. 原地升级 params_schema（dict → list，重写 41 个类型的元数据，所有已有测试需更新）
+  3. 新建独立 param_schema 模块（不动 StepTypeMeta）
+- **用户选择**：选 1 新增 fields 字段
+- **影响**：StepTypeMeta 加 `fields` 字段默认空列表，旧 `params_schema` 不删；新组件 `param_editor` 优先读 `fields`
+
+### Q18. NOT_IMPLEMENTED 类型参数表单
+- **问题**：占位步骤的参数表单怎么处理？Q14 已定「自动保存占位」。
+- **选项**：
+  1. 允许填参数+保存为占位（用户可预先规划）
+  2. 显示但只读禁用
+  3. 不显示参数表单
+- **用户选择**：选 1 允许填参数+保存为占位
+- **影响**：param_editor 对所有 StepType（含 NOT_IMPLEMENTED）都渲染表单，占位标记在 StepCard 层面体现
+
+### Q19. 字段控件类型策略
+- **问题**：每个参数字段渲染成什么输入控件？
+- **选项**：
+  1. 按字段类型自动选控件（bool→Switch、enum→Dropdown、int_range→Slider、其他→TextField）
+  2. 统一 TextField（所有字段都输字符串）
+  3. 混合策略（默认 TextField，bool→Switch，有限选项→Dropdown）
+- **用户选择**：选 1 按字段类型自动选控件
+- **影响**：FieldType 枚举：BOOL / INT / INT_RANGE / STRING / TEXTAREA / ENUM / COORDINATE；ParamEditor 按类型分发渲染
+
+### Q20. 未保存离开策略
+- **问题**：用户改了参数但没点保存就返回，怎么处理？
+- **选项**：
+  1. 提示保存对话框（保存并退出/不保存退出/继续编辑）
+  2. 自动保存草稿（无打扰）
+  3. 直接丢弃
+- **用户选择**：选 1 提示保存对话框
+- **影响**：T2.7 step_editor_view 返回时检测 dirty 状态，弹 AlertDialog 让用户三选一；param_editor 暴露 `is_dirty()` + `get_values()` 方法供 view 层调用
+
+---
