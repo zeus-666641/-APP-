@@ -14,7 +14,7 @@ class HomeView(ft.View):
             controls=[
                 ft.AppBar(
                     title=ft.Text("首页"),
-                    bgcolor=ft.colors.SURFACE_VARIANT,
+                    bgcolor=ft.Colors.SURFACE_VARIANT,
                 ),
                 ft.SafeArea(
                     ft.Column(
@@ -24,10 +24,10 @@ class HomeView(ft.View):
                                 size=28,
                                 weight=ft.FontWeight.BOLD,
                             ),
-                            ft.Text("v0.1.0", size=12, color=ft.colors.ON_SURFACE_VARIANT),
+                            ft.Text("v0.1.0", size=12, color=ft.Colors.ON_SURFACE_VARIANT),
                             ft.ElevatedButton(
                                 text="设置",
-                                icon=ft.icons.SETTINGS,
+                                icon=ft.Icons.SETTINGS,
                                 on_click=lambda _: page.go("/settings"),
                             ),
                         ],
